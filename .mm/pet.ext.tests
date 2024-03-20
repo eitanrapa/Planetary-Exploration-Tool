@@ -1,0 +1,15 @@
+# -*- makefile -*-
+#
+# the pet development team
+# (c) 2023-2024 all rights reserved
+
+
+# the testsuite for the pet bindings
+pet.ext.tests.stem := pet.ext
+# depends on
+pet.ext.tests.prerequisites := pet.ext
+# external dependencies
+pet.ext.tests.extern := $(pet.ext.extern)
+
+
+# end of file
