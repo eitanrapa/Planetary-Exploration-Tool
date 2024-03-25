@@ -37,8 +37,12 @@ home, prefix, defaults = package.layout()
 from .ext import libpet
 # basic functionality
 from . import meta
+# abstractions
+from . import protocols
+# planets
+from . import planets
 
-# by conventions
+# by convention
 __version__ = meta.version
 
 # administrivia

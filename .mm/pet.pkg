@@ -10,7 +10,7 @@
 pet.pkg.root := pkg/pet/
 
 # its plexus wrapper is in {bin}
-pet.pkg.drivers := pet
+pet.pkg.drivers := pet body
 
 # its configuration files are in {share}
 pet.pkg.defaults := share/
