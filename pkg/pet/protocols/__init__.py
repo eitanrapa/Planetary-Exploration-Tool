@@ -7,5 +7,7 @@
 #
 
 from .Planet import Planet as planet
+from .Instrument import Instrument as instrument
+from .Shape import Shape as shape
 
 # end of file

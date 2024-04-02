@@ -5,9 +5,11 @@
 # (c) 2023-2024 all rights reserved
 
 import pet
-import pyre
 from pyre.units.SI import meter, second
 from pyre.units.angle import degree
+import pickle
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 
 
 class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.protocols.planet):
@@ -23,10 +25,43 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     inclination = 0.009 * degree
 
     @pet.export
-    def topography(self):
+    def get_topography(self, coordinate_system="geodetic"):
         """
         Provides a list of control points that defines the surface of Enceladus
         """
+        if (coordinate_system is not "geodetic") or (coordinate_system is not "cartesian"):
+            raise Exception("Coordinate system must be either 'geodetic' or 'cartesian'")
+        if coordinate_system == "geodetic":
+            # Load from file
+            with open('/home/erapapor/kraken-bak/Enceladus-Exploration-Twin-files/model_files/geodetic_topography.bin',
+                      'rb') as file:
+                topography = pickle.load(file)
+        else:
+            with open('/home/erapapor/kraken-bak/Enceladus-Exploration-Twin-files/model_files/cartesian_topography.bin',
+                      'rb') as file:
+                topography = pickle.load(file)
+
+        return topography
+
+    @pet.export
+    def visualize_topography(self):
+        """
+        Creates a visualization of the surface of Enceladus
+        """
+        return None
+
+    @pet.export
+    def get_surface_deformation(self):
+        """
+        Returns the crustal deformation of Enceladus at a specific time in its tidal cycle
+        """
         return []
+
+    @pet.export
+    def visualize_deformation(self):
+        """
+        Creates a visualization of the surface deformation of Enceladus at a specific time in its tidal cycle
+        """
+        return None
 
 # end of file
