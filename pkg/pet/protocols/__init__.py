@@ -9,5 +9,6 @@
 from .Planet import Planet as planet
 from .Instrument import Instrument as instrument
 from .Shape import Shape as shape
+from .Orbit import Orbit as orbit
 
 # end of file

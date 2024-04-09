@@ -20,4 +20,10 @@ class Planet(pet.protocol, family="pet.planets"):
         Generate an array of points that defines surface of planet
         """
 
+    @pet.provides
+    def visualize_topography(self):
+        """
+        Visualizes the topography that defines the surface of a planet
+        """
+
 # end of file

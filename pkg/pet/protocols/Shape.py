@@ -14,21 +14,21 @@ class Shape(pet.protocol, family="pet.shapes"):
     """
 
     @pet.provides
-    def intersect(self, position):
+    def project(self, points):
         """
         A function to calculate the intersect of ray created by a position and the shape
         """
 
     @pet.provides
-    def cartesian_to_geodetic(self, x, y, z):
+    def geodetic(self, points):
         """
-        Function to convert between cartesian and geodetic coordinates
+        Function to convert Cartesian coordinates to geodetic
         """
 
     @pet.provides
-    def geodetic_to_cartesian(self):
+    def cartesian(self, points):
         """
-        Function to convert between geodetic and cartesian coordinates
+        Function to convert geodetic coordinates to Cartesian
         """
 
 # end of file

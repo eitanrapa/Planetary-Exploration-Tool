@@ -72,7 +72,7 @@ def get_look_angle(surface_position, satellite_position, shape):
     # Get the distance between the satellite and the surface point
     distance = get_distance_cartesian(surface_x, surface_y, surface_z, satellite_x, satellite_y, satellite_z)
 
-    # Calculate the satellite interesect with the shape
+    # Calculate the satellite intersect with the shape
     intersect_x, intersect_y, intersect_z = shape.intersect(satellite_position)
 
     # Calculate the distance between center and satellite intersect

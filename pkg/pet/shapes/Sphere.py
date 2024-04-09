@@ -18,24 +18,35 @@ class Sphere(pet.component, family="pet.shapes.sphere", implements=pet.protocols
     r.doc = "radius of the sphere"
 
     @pet.export
-    def intersect(self):
+    def project(self, cartesian):
         """
-
+        Calculates the projection of a point on a sphere
+        :param cartesian: x, y, z points to use as a vector from the origin
+        :return: x, y, z at the point the vector intersects the ellipsoid
         """
-        return []
-
-    @pet.export
-    def cartesian_to_geodetic(self, x, y, z):
-        """
-        """
+        # Unpack the coordinate system
+        x, y, z = cartesian
 
         return []
 
     @pet.export
-    def geodetic_to_cartesian(self, long, lat, height):
+    def geodetic(self, cartesian):
         """
+        A function that converts between cartesian and geodetic coordinates in a triaxial ellipsoid
+        """
+        # Unpack the coordinate system
+        x, y, z = cartesian
 
+        return []
+
+    @pet.export
+    def cartesian(self, geodetic):
         """
+        A function that converts between geodetic and cartesian coordinates in a triaxial ellipsoid
+        """
+        # Unpack the coordinate system
+        long, lat, height = geodetic
+
         return []
 
 # end of file

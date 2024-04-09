@@ -25,7 +25,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     inclination = 0.009 * degree
 
     @pet.export
-    def get_topography(self, coordinate_system="geodetic"):
+    def topography(self, coordinate_system="geodetic"):
         """
         Provides a list of control points that defines the surface of Enceladus
         """
@@ -51,7 +51,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         return None
 
     @pet.export
-    def get_surface_deformation(self):
+    def surface_deformation(self):
         """
         Returns the crustal deformation of Enceladus at a specific time in its tidal cycle
         """

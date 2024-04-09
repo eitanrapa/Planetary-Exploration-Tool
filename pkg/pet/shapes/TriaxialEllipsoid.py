@@ -11,7 +11,7 @@ import scipy.optimize
 
 class TriaxialEllipsoid(pet.component, family="pet.shapes.triaxialellipsoid", implements=pet.protocols.shape):
     """
-
+    A function that represents the triaxial ellipsoid shape and its geometric functions
     """
 
     a = pet.properties.float()
@@ -27,36 +27,57 @@ class TriaxialEllipsoid(pet.component, family="pet.shapes.triaxialellipsoid", im
     c.doc = "third of the semiaxes"
 
     @pet.export
-    def intersect(self, position):
+    def project(self, points):
         """
-        Calculates the geocentric radius of a point on Enceladus.
-        :param position: x, y, z points to use as a vector from the origin
-        :return: x, y, z at the point the vector intersects the ellipsoid
+        Calculates the projection of a point on the triaxial ellipsoid
+        :param points: set of x, y, z points to use as a vector from the origin
+        :return: set of x, y, z at the point the vector intersects the ellipsoid
         """
-        # Unpack the position
-        x, y, z = position
 
         # Define an ellipsoid function using the parametric versions of the position vector and set it equal to 0
-        def f(t): return (x * t) ** 2 / self.a ** 2 + (y * t) ** 2 / self.b ** 2 + (z * t) ** 2 / self.c ** 2 - 1
+        def f(t, x0, y0, z0): return ((x0 * t) ** 2 / self.a ** 2 +
+                                      (y0 * t) ** 2 / self.b ** 2 + (z0 * t) ** 2 / self.c ** 2 - 1)
 
-        # Find the root
-        root = scipy.optimize.fsolve(f, 1)
+        # Create a generator
+        for point in points:
+            # Unpack the coordinate system
+            x, y, z = point
 
-        # return the intersecting point by plugging in the root
-        return x * root, y * root, z * root
+            # Find the root, with arbitrary starting estimate
+            starting_estimate = 1
+            root = scipy.optimize.fsolve(f, starting_estimate, args=(x, y, z))
+
+            # return the intersecting point by plugging in the root
+            yield x * root, y * root, z * root
+
+        return
 
     @pet.export
-    def cartesian_to_geodetic(self, x, y, z):
+    def geodetic(self, points):
         """
+        A function that converts Cartesian points to geodetic in a triaxial ellipsoid
+        :param points: set of x, y, z points
+        :return: long, lat, height of the points
         """
+        # Create a generator
+        for point in points:
+            # Unpack the coordinate system
+            x, y, z = point
 
-        return []
+        return
 
     @pet.export
-    def geodetic_to_cartesian(self, long, lat, height):
+    def cartesian(self, points):
         """
+        A function that converts geodetic points to Cartesian in a triaxial ellipsoid
+        :param points: set of long, lat, height points
+        :return: x, y, z of the points
+        """
+        # Create a generator
+        for point in points:
+            # Unpack the coordinate system
+            long, lat, height = point
 
-        """
-        return []
+        return
 
 # end of file
