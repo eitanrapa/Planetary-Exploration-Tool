@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-# -*- Python -*-
+# -*- yaml -*-
 # -*- coding: utf-8 -*-
 #
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from .Sphere import Sphere as sphere
-from .TriaxialEllipsoid import TriaxialEllipsoid as triaxialEllipsoid
+tri:
+  a: 4
+  b: 5
+  c: 6
 
 # end of file

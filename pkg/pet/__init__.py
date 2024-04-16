@@ -41,11 +41,17 @@ from . import meta
 from . import protocols
 # planets
 from . import planets
+# shapes
+from . import shapes
+# orbits
+from . import orbits
+# instruments
+from . import instruments
 
 # by convention
 __version__ = meta.version
 
-# administrivia
+# administrative
 def copyright():
     """
     Return the copyright note

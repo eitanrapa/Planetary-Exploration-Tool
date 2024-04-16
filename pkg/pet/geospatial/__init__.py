@@ -5,6 +5,6 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from .Geometry import Geometry as geometry
+from .GroundTarget import GroundTarget as groundTarget
 
 # end of file

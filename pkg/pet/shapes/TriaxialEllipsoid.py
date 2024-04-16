@@ -9,7 +9,7 @@ import pet
 import scipy.optimize
 
 
-class TriaxialEllipsoid(pet.component, family="pet.shapes.triaxialellipsoid", implements=pet.protocols.shape):
+class TriaxialEllipsoid(pet.component, family="pet.shapes.triaxialEllipsoid", implements=pet.protocols.shape):
     """
     A function that represents the triaxial ellipsoid shape and its geometric functions
     """
@@ -45,7 +45,7 @@ class TriaxialEllipsoid(pet.component, family="pet.shapes.triaxialellipsoid", im
 
             # Find the root, with arbitrary starting estimate
             starting_estimate = 1
-            root = scipy.optimize.fsolve(f, starting_estimate, args=(x, y, z))
+            root = scipy.optimize.fsolve(f, starting_estimate, args=point)
 
             # return the intersecting point by plugging in the root
             yield x * root, y * root, z * root
@@ -59,6 +59,7 @@ class TriaxialEllipsoid(pet.component, family="pet.shapes.triaxialellipsoid", im
         :param points: set of x, y, z points
         :return: long, lat, height of the points
         """
+
         # Create a generator
         for point in points:
             # Unpack the coordinate system
@@ -73,6 +74,7 @@ class TriaxialEllipsoid(pet.component, family="pet.shapes.triaxialellipsoid", im
         :param points: set of long, lat, height points
         :return: x, y, z of the points
         """
+
         # Create a generator
         for point in points:
             # Unpack the coordinate system
