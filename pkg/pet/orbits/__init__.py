@@ -5,6 +5,6 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from .PolarOrbit import PolarOrbit as polarorbit
+from .PolarOrbit import PolarOrbit as polarOrbit
 
 # end of file

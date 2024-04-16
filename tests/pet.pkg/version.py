@@ -13,7 +13,6 @@ Version check
 def test():
     # access the {pet} package
     import pet
-    # access the {pet} extension
     from pet import libpet
     # verify that the static and current versions match
     assert libpet.version.static() == pet.version()
@@ -23,12 +22,9 @@ def test():
     return
 
 
-
 # main
 if __name__ == "__main__":
     # do...
     test()
 
-
 # end of file
-

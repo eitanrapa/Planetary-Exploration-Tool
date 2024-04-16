@@ -5,7 +5,12 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from .Sphere import Sphere as sphere
-from .TriaxialEllipsoid import TriaxialEllipsoid as triaxialEllipsoid
+import pet
+
+
+class DeformationMap(pet.component):
+    """
+
+    """
 
 # end of file
