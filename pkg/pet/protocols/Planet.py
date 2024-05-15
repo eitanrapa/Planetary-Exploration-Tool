@@ -15,9 +15,21 @@ class Planet(pet.protocol, family="pet.planets"):
     """
 
     @pet.provides
-    def topography(self):
+    def get_axes(self):
         """
-        Generate an array of points that defines surface of planet
+
+        """
+
+    @pet.provides
+    def get_surface_intersect(self, vector):
+        """
+
+        """
+
+    @pet.provides
+    def get_sub_obs_point(self, time, instrument_id):
+        """
+
         """
 
     @pet.provides

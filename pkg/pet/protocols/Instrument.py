@@ -13,4 +13,22 @@ class Instrument(pet.protocol, family="pet.instruments"):
     The abstract specification for radar instruments
     """
 
+    @pet.provides
+    def convert_time(self, time):
+        """
+
+        """
+
+    @pet.provides
+    def get_state(self, target_body_id, time, reference_body):
+        """
+
+        """
+
+    @pet.provides
+    def plot_orbit(self, target_body_id, start_time, end_time, reference_body):
+        """
+
+        """
+
 # end of file

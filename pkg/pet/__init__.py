@@ -41,12 +41,10 @@ from . import meta
 from . import protocols
 # planets
 from . import planets
-# shapes
-from . import shapes
-# orbits
-from . import orbits
 # instruments
 from . import instruments
+# inSAR
+from . import insar
 
 # by convention
 __version__ = meta.version

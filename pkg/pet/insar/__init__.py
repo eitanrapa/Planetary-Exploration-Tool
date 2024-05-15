@@ -6,5 +6,7 @@
 # (c) 2023-2024 all rights reserved
 
 from .GroundTarget import GroundTarget as groundTarget
+from .DisplacementMap import DisplacementMap as displacementMap
+from .GroundSwath import GroundSwath as groundSwath
 
 # end of file

@@ -12,7 +12,7 @@ Sanity check: verify that the {pet} package is accessible
 
 def test():
     # access the {pet.shapes} sub-package
-    import pet.shapes
+    import pet.insar
     # all done
     return
 
@@ -21,6 +21,5 @@ def test():
 if __name__ == "__main__":
     # do...
     test()
-
 
 # end of file

@@ -1,7 +1,7 @@
 #include "geodetic.h"
 
-auto pih = M_PI_2;
-auto pi = M_PI;
+static auto pih = M_PI_2;
+static auto pi = M_PI;
 
 // ---------------------------------------
 //  FUNCTIONS

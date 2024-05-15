@@ -5,14 +5,9 @@
 # (c) 2023-2024 all rights reserved
 
 import pet
+import spiceypy as spice
 from pyre.units.SI import meter, second
 from pyre.units.angle import degree
-import pickle
-import cartopy.crs as ccrs
-import matplotlib.pyplot as plt
-import h5py
-import numpy as np
-from scipy.interpolate import CubicSpline
 
 
 class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.protocols.planet):
@@ -20,24 +15,27 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     An encapsulation of the data and parameters used to represent the planetary body of Enceladus
     """
 
-    # Geometry
-    major_equatorial_semiaxis = 256.6 * 1e3 * meter
-    minor_equatorial_semiaxis = 251.4 * 1e3 * meter
-    polar_semiaxis = 248.3 * 1e3 * meter
-    orbital_time = 118386.8352 * second
-    inclination = 0.009 * degree
+    body_id = "602"
+    reference_id = "IAU_ENCELADUS"
 
     @pet.export
-    def topography(self):
-        """
-        Provides a list of control points that defines the surface of Enceladus
-        """
+    def get_axes(self):
+        a, b, c = spice.bodvcd(bodyid=int(self.body_id), item="RADII", maxn=3)[1]  # in km
+        return a, b, c
 
-        # Load the topography
-        topography = np.loadtxt('') * 1e3  # Convert to meters
-        topography = topography.astype(float)
+    @pet.export
+    def get_surface_intersect(self, vector):
+        handle = spice.kdata(which=0, kind="dsk", fillen=128, typlen=32, srclen=128)[3]
+        dla = spice.dlabfs(handle=handle)
+        intersect = spice.dskx02(handle=handle, dladsc=dla, vertex=vector * 10, raydir=vector - (vector * 10))[1]
+        return intersect
 
-        return topography
+    @pet.export
+    def get_sub_obs_point(self, time, instrument_id):
+        sub_point, surface_vector = spice.subpnt(method="nadir/dsk/unprioritized",
+                                                 target=self.body_id, et=time, fixref=self.reference_id,
+                                                 abcorr="None", obsrvr=str(instrument_id))[::2]
+        return sub_point, spice.vnorm(v=surface_vector)
 
     @pet.export
     def visualize_topography(self):
@@ -45,46 +43,9 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         Creates a visualization of the surface of Enceladus
         """
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.plot_trisurf(X, Y, Z, color='white', edgecolors='grey', alpha=0.5)
-        ax.scatter(X, Y, Z, c='red')
-        plt.show()
-
         return
 
-    @pet.export
-    def interpolate_displacement(self, longitudes, latitudes, cube, longitude, latitude, time):
-        modified_time = (self.orbital_time / time) % 1
-
-        displacements = cube[longitude, latitude, :]
-
-        # Create a cubic spline for each coordinate
-        cs = CubicSpline(time_vector, displacements)
-
-        return cs(modified_time)
-
-    @pet.export
-    def surface_displacement(self, longitude, latitude, time):
-        """
-        Returns the crustal deformation of Enceladus at a specific time in its tidal cycle
-        """
-
-        displacement_file = h5py.File('', 'r')
-        east_cube = displacement_file["data/east_vectors"]
-        north_cube = displacement_file["data/north_vectors"]
-        up_cube = displacement_file["data/up_vectors"]
-        latitudes = displacement_file["metadata/latitudes"]
-        longitudes = displacement_file["metadata/longitudes"]
-
-        east_displacement = self.interpolate_displacement(longitudes, latitudes, east_cube, longitude, latitude, time)
-        north_displacement = self.interpolate_displacement(longitudes, latitudes, north_cube, longitude, latitude, time)
-        up_displacement = self.interpolate_displacement(longitudes, latitudes, up_cube, longitude, latitude, time)
-
-        return east_displacement, north_displacement, up_displacement
-
-    @pet.export
-    def visualize_deformation(self):
+    def visualize_deformation(self, displacements):
         """
         Creates a visualization of the surface deformation of Enceladus at a specific time in its tidal cycle
         """
