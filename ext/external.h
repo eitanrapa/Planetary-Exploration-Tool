@@ -7,7 +7,6 @@
 #if !defined(pet_py_external_h)
 #define pet_py_external_h
 
-
 // STL
 #include <string>
 

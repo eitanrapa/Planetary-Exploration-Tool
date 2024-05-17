@@ -8,6 +8,8 @@
 import pet
 import numpy as np
 import spiceypy as spice
+import rasterio
+from matplotlib import pyplot
 from .GroundTarget import GroundTarget
 
 class GroundSwath(pet.component):
@@ -31,8 +33,23 @@ class GroundSwath(pet.component):
         super().__init__(name, locator, implicit)
         self.time_space = None
         self.swath_beams = []
+        self.raster_fp = ""
 
-    def get_swath(self, instrument, planet):
+    def make_raster(self):
+        z = np.empty((len(self.swath_beams), len(self.swath_beams[0])))
+        for i in range(len(self.swath_beams)):
+            for j in range(len(self.swath_beams[0])):
+                z[i][j] = self.swath_beams[i][j].z
+
+        self.raster_fp = '/tmp/new.tif'
+        new_dataset = rasterio.open(fp='/tmp/new.tif', mode='w', driver='GTiff',
+                                    height=z.shape[0], width=z.shape[1],
+                                    count=1, dtype=z.dtype, crs='+proj=cart')
+
+        new_dataset.write(z, 1)
+        new_dataset.close()
+
+    def calculate_swath(self, instrument, planet):
         """
 
         """
@@ -123,11 +140,14 @@ class GroundSwath(pet.component):
             # Add all accepted points in azimuthal beam to swath
             self.swath_beams.append(azimuthal_points)
 
-        return self.swath_beams
-
     def visualize(self):
         """
 
         """
+
+        self.make_raster()
+        src = rasterio.open(fp=self.raster_fp)
+        pyplot.imshow(src.read(1), cmap='pink')
+        pyplot.show()
 
 # end of file

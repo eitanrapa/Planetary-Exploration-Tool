@@ -10,11 +10,11 @@
 
 // the {project.name} namespace
 namespace pet::py {
+
     // bindings of opaque types
     void opaque(py::module &);
     // exceptions
     void exceptions(py::module &);
-
     // version info
     void version(py::module &);
 }

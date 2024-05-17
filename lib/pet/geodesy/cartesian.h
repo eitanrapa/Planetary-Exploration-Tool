@@ -5,6 +5,12 @@
 #define zero 0.0
 #define one 1.0
 
+#ifndef CARTESIAN_H
+#define CARTESIAN_H
+
+#ifndef MYSTRUCT_DEFINED
+#define MYSTRUCT_DEFINED
+
 struct CartesianPoint{
 double x;
 double y;
@@ -23,6 +29,12 @@ double b;
 double c;
 };
 
-// Function declarations
+#endif // MYSTRUCT_DEFINED
 
-void direct(const TriaxialEllipsoid& te, const GeodeticPoint& gp, CartesianPoint& cp);
+// Function declarations
+namespace pet {
+    // cartesian
+    void cartesian(const TriaxialEllipsoid& te, const GeodeticPoint& gp, CartesianPoint& cp);
+}
+
+#endif

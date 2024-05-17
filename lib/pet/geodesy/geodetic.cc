@@ -7,7 +7,7 @@ static auto pi = M_PI;
 //  FUNCTIONS
 // ---------------------------------------
 
-int cart2geod(const TriaxialEllipsoid& te, const CartesianPoint& cp, GeodeticPoint& gp, double tol)
+int pet::geodetic(const TriaxialEllipsoid& te, const CartesianPoint& cp, GeodeticPoint& gp, double tol)
 //  Principal function for the transformation of Cartesian to geodetic coordinates
 //  Angular coordinates in radians
 {
@@ -74,7 +74,7 @@ int cart2geod(const TriaxialEllipsoid& te, const CartesianPoint& cp, GeodeticPoi
 		else  {
 			x0=x/te.a;
 			y0=y/te.b;
-			n=bisect2(x0,y0,cz,tol,m,Mm);
+			n=pet::bisect2(x0,y0,cz,tol,m,Mm);
 			sx=cz*x/(cz+m);
 			sz=zero;
 			sy=y/(one+m);
@@ -92,7 +92,7 @@ int cart2geod(const TriaxialEllipsoid& te, const CartesianPoint& cp, GeodeticPoi
 			x0=x/te.a;
 			y0=y/te.b;
 			z0=z/te.c;
-			n=bisect3(x0,y0,z0,cx,cy,tol,m,Mm);
+			n=pet::bisect3(x0,y0,z0,cx,cy,tol,m,Mm);
 			sx=cx*x/(cx+m);
 			sy=cy*y/(cy+m);
 			if ((m<zero) && ((ky2*x2 + kx2*y2) < (kx2*ky2)))  
@@ -104,7 +104,7 @@ int cart2geod(const TriaxialEllipsoid& te, const CartesianPoint& cp, GeodeticPoi
 	
 //- Determination of latitude & longitude of foot point -----	
 
-	xyz2fl(sx,sy,sz,mee,mex,gp.latitude,gp.longitude);
+	pet::xyz2fl(sx,sy,sz,mee,mex,gp.latitude,gp.longitude);
 
 //- Determination of geodetic height -----	
 
@@ -117,7 +117,7 @@ int cart2geod(const TriaxialEllipsoid& te, const CartesianPoint& cp, GeodeticPoi
 
 //- Adjust latitude & longitude according to signs of (cp.x,cp.y,cp.z)
 
-	fl_octal(cp.x,cp.y,cp.z,gp.latitude,gp.longitude);
+	pet::fl_octal(cp.x,cp.y,cp.z,gp.latitude,gp.longitude);
 
 //- Convert to degrees
 
@@ -127,7 +127,7 @@ int cart2geod(const TriaxialEllipsoid& te, const CartesianPoint& cp, GeodeticPoi
 	return n;
 }
 
-void xyz2fl(double x,double y,double z, double mee, double mex, double &latitude,double &longitude)
+void pet::xyz2fl(double x,double y,double z, double mee, double mex, double &latitude,double &longitude)
 //  Computes the transformation of Cartesian to geodetic coordinates on the surface of the ellipsoid
 //  assuming x,y,z are all non-negative
 //  Angular coordinates in radians
@@ -161,7 +161,7 @@ void xyz2fl(double x,double y,double z, double mee, double mex, double &latitude
 	}
 }
 
-void fl_octal(double x,double y,double z,double &latitude,double &longitude)
+void pet::fl_octal(double x,double y,double z,double &latitude,double &longitude)
 //  Adjusts latitude & longitude according to signs of x,y,z  (angles in radians)
 {
 	if (z<zero)   {latitude=-latitude;}
@@ -174,7 +174,7 @@ void fl_octal(double x,double y,double z,double &latitude,double &longitude)
 	}	
 }
 
-int bisect2(double x0,double y0,double cz, double tol,double &m,double &Gm)
+int pet::bisect2(double x0,double y0,double cz, double tol,double &m,double &Gm)
 //  Implements the bisection method on the X-Y plane
 {
 	int n;
@@ -198,7 +198,7 @@ int bisect2(double x0,double y0,double cz, double tol,double &m,double &Gm)
 		
 		if  (Gm==zero)  { return n; }
 		else  {
-			if (sign(Gm)==sign(Gd))  {
+			if (pet::sign(Gm)==pet::sign(Gd))  {
 				d1=m;
 				Gd=Gm;
 			}
@@ -214,7 +214,7 @@ int bisect2(double x0,double y0,double cz, double tol,double &m,double &Gm)
 	return n;	
 }
 
-int bisect3(double x0,double y0,double z0, double cx, double cy, double tol,double &m,double &Hm)
+int pet::bisect3(double x0,double y0,double z0, double cx, double cy, double tol,double &m,double &Hm)
 //  Implements the bisection method in 3D space
 {
 	int n;
@@ -239,7 +239,7 @@ int bisect3(double x0,double y0,double z0, double cx, double cy, double tol,doub
 		
 		if  (Hm==zero)  { return n; }
 		else  {
-			if (sign(Hm)==sign(Hd))  {
+			if (pet::sign(Hm)==pet::sign(Hd))  {
 				d1=m;
 				Hd=Hm;
 			}
@@ -255,7 +255,7 @@ int bisect3(double x0,double y0,double z0, double cx, double cy, double tol,doub
 	return n;	
 }
 
-int sign(double t)
+int pet::sign(double t)
 //  Returns the sign of its argument
 {
 	int n;

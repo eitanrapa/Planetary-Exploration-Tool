@@ -3,7 +3,7 @@
 static auto pih = M_PI_2;
 static auto pi = M_PI;
 
-void direct(const TriaxialEllipsoid& te, const GeodeticPoint& gp, CartesianPoint& cp)
+void pet::cartesian(const TriaxialEllipsoid& te, const GeodeticPoint& gp, CartesianPoint& cp)
 //  Computes the direct transformation of geodetic to Cartesian coordinates
 //  Angular coordinates in radians
 {

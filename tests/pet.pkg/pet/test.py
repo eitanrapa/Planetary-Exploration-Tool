@@ -8,43 +8,51 @@
 import pathlib
 import spiceypy as spice
 import pet
+import rasterio
 
-path = pathlib.PosixPath("/home/eitanrapa/Documents/projects/other")
-spice.furnsh(str(path / "cas_enceladus_ssd_spc_1024icq_v1.bds"))  # Topography of Enceladus
-spice.furnsh(str(path / "pck00011_n0066.tpc"))  # Reference frames
-spice.furnsh(str(path / "insar_6stride_26d_v7_seo.bsp"))  # Ephemeris data
-spice.furnsh(str(path / "latest_leapseconds.tls"))  # Leap seconds file
+# path = pathlib.PosixPath("/home/eitanrapa/Documents/projects/other")
+# spice.furnsh(str(path / "cas_enceladus_ssd_spc_1024icq_v1.bds"))  # Topography of Enceladus
+# spice.furnsh(str(path / "pck00011_n0066.tpc"))  # Reference frames
+# spice.furnsh(str(path / "insar_6stride_26d_v7_seo.bsp"))  # Ephemeris data
+# spice.furnsh(str(path / "latest_leapseconds.tls"))  # Leap seconds file
+#
+# gs = pet.insar.groundSwath(name="1", start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 20 15:11:40.134",
+#                              time_interval=10, ground_resolution=2.0)
+#
+# ins = pet.instruments.nightingale(name="nightingale", body_id=-303, start_look_angle=25, end_look_angle=35)
+#
+# planet = pet.planets.enceladus(name="enceladus")
+#
+# planet.visualize_topography()
 
-gs = pet.insar.groundSwath(name="1", start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 20 15:10:40.134",
-                             time_interval=10, ground_resolution=2.0)
+import pet
+cartesian_point = pet.ext.pet.cartesian([6378172, 6378103, 6356753, 55.75, 46.5, -1589188.43460915])
 
-ins = pet.instruments.nightingale(name="nightingale", body_id=-303, start_look_angle=25, end_look_angle=35)
-
-planet = pet.planets.enceladus(name="enceladus")
-
-swath = gs.get_swath(instrument=ins, planet=planet)
+# gs.calculate_swath(instrument=ins, planet=planet)
 
 # displacements = pet.insar.displacementMap(name="base", displacement_data_path=path / "Simulation_Base_Results.hdf5")
 #
 # displacements.attach(swath)
 
-spice.kclear()
+# gs.visualize()
 
-import matplotlib.pyplot as plt
+# spice.kclear()
 
-# Plot X,Y,Z
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-x = []
-y = []
-z = []
-for beam in swath:
-    for point in beam:
-        x.append(point.x)
-        y.append(point.y)
-        z.append(point.z)
-ax.plot_trisurf(x, y, z, color='white', edgecolor='none', linewidth=0, antialiased=False, alpha=0.5)
-ax.scatter(x, y, z, c='red')
-plt.show()
+# import matplotlib.pyplot as plt
+#
+# # Plot X,Y,Z
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# x = []
+# y = []
+# z = []
+# for beam in swath:
+#     for point in beam:
+#         x.append(point.x)
+#         y.append(point.y)
+#         z.append(point.z)
+# ax.plot_trisurf(x, y, z, color='white', edgecolor='none', linewidth=0, antialiased=False, alpha=0.5)
+# ax.scatter(x, y, z, c='red')
+# plt.show()
 
 # end of file

@@ -6,8 +6,11 @@
 
 import pet
 import spiceypy as spice
-from pyre.units.SI import meter, second
-from pyre.units.angle import degree
+from matplotlib import pyplot
+import numpy as np
+from matplotlib.colors import LightSource
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.interpolate import griddata
 
 
 class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.protocols.planet):
@@ -42,6 +45,30 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         """
         Creates a visualization of the surface of Enceladus
         """
+        handle = spice.kdata(which=0, kind="dsk", fillen=128, typlen=32, srclen=128)[3]
+        dla = spice.dlabfs(handle=handle)
+        n_vert = spice.dskb02(handle=handle, dladsc=dla)[0]
+        vertices = spice.dskv02(handle=handle, dladsc=dla, start=1, room=n_vert)
+        x = vertices[:, 0]
+        y = vertices[:, 1]
+        z = vertices[:, 2]
+
+        # Define grid
+        grid_x, grid_y = np.meshgrid(np.linspace(x.min(), x.max(), 1000),
+                                     np.linspace(y.min(), y.max(), 1000))
+
+        # Interpolate z values on the grid
+        grid_z = griddata((x, y), z, (grid_x, grid_y), method='cubic')
+
+        fig = pyplot.figure(figsize=(10, 7))
+        ax = pyplot.axes(projection='3d')
+        cmap = pyplot.get_cmap('terrain')
+        surf = ax.plot_surface(grid_x, grid_y, grid_z, cmap=cmap, edgecolor='none')
+        # ls = LightSource(azdeg=315, altdeg=45)
+        # rgb = ls.shade(grid.T, cmap=cmap, blend_mode='soft', vert_exag=100)
+        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+        ax.set_title('Surface plot')
+        pyplot.show()
 
         return
 
@@ -49,6 +76,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         """
         Creates a visualization of the surface deformation of Enceladus at a specific time in its tidal cycle
         """
+
 
         return
 
