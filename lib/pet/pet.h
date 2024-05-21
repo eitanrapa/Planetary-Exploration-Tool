@@ -4,9 +4,11 @@
 // (c) 2023-2024 all rights reserved
 //
 
+// header guard
 #ifndef PET_H
 #define PET_H
 
+// abstract structs
 struct CartesianPoint;
 struct GeodeticPoint;
 struct TriaxialEllipsoid;

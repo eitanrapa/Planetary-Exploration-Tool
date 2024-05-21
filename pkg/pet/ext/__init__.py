@@ -7,6 +7,7 @@
 try:
     # pull the extension module
     from . import pet as libpet
+    from .Conversions import Conversions as conversions
 # if this fails
 except ImportError:
     # indicate the bindings are not accessible

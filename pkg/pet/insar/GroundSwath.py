@@ -12,6 +12,7 @@ import rasterio
 from matplotlib import pyplot
 from .GroundTarget import GroundTarget
 
+
 class GroundSwath(pet.component):
     """
 
@@ -98,7 +99,7 @@ class GroundSwath(pet.component):
 
                 # Make a GroundTarget object with the x, y, z coordinates of intersect
                 ground = GroundTarget(name="{}".format(theta),
-                                                   x=intersect[0], y=intersect[1], z=intersect[2])
+                                      x=intersect[0], y=intersect[1], z=intersect[2])
 
                 # Calculate and check position of groundTarget with respect to satellite
                 if ground.point_position_relative_to_satellite(instrument=instrument, time=time,

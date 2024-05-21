@@ -5,12 +5,15 @@
 #define zero 0.0
 #define one 1.0
 
+// header guard
 #ifndef GEODETIC_H
 #define GEODETIC_H
 
+// struct guard
 #ifndef MYSTRUCT_DEFINED
 #define MYSTRUCT_DEFINED
 
+// define structs
 struct CartesianPoint{
 double x;
 double y;

@@ -9,8 +9,7 @@
 // namespace setup
 #include "forward.h"
 
-#include "pet/geodesy.h"
-#include "pet/metadata.h"
+#include <pet/pet.h>
 
 namespace py = pybind11;
 
@@ -20,9 +19,32 @@ PYBIND11_MODULE(pet, m)
     // the doc string
     m.doc() = "the libpet bindings";
 
-    // Bind the geodesy functions
-    m.def("cartesian", &pet::extension::cartesian, py::return_value_policy::reference);
-    m.def("geodetic", &pet::extension::geodetic, py::return_value_policy::reference);
+    py::class_<CartesianPoint>(m, "CartesianPoint")
+        .def(py::init<>())
+        .def(py::init<double, double, double>(), py::arg("x"), py::arg("y"), py::arg("z"))
+        .def_readwrite("x", &CartesianPoint::x)
+        .def_readwrite("y", &CartesianPoint::y)
+        .def_readwrite("z", &CartesianPoint::z);
+
+    py::class_<GeodeticPoint>(m, "GeodeticPoint")
+        .def(py::init<>())
+        .def(py::init<double, double, double>(), py::arg("latitude"), py::arg("longitude"), py::arg("height"))
+        .def_readwrite("latitude", &GeodeticPoint::latitude)
+        .def_readwrite("longitude", &GeodeticPoint::longitude)
+        .def_readwrite("height", &GeodeticPoint::height);
+
+    py::class_<TriaxialEllipsoid>(m, "TriaxialEllipsoid")
+        .def(py::init<>())
+        .def(py::init<double, double, double>(), py::arg("a"), py::arg("b"), py::arg("c"))
+        .def_readwrite("a", &TriaxialEllipsoid::a)
+        .def_readwrite("b", &TriaxialEllipsoid::b)
+        .def_readwrite("c", &TriaxialEllipsoid::c);
+
+    m.def("cartesian", &pet::cartesian, "Compute Cartesian coordinates",
+          py::arg("te"), py::arg("gp"), py::arg("cp"));
+
+    m.def("geodetic", &pet::geodetic, "Compute Geodetic coordinate",
+        py::arg("te"), py::arg("cp"), py::arg("gp"), py::arg("tol"));
 
     // bind the opaque types
     pet::py::opaque(m);
