@@ -15,7 +15,9 @@ from .GroundTarget import GroundTarget
 
 class GroundSwath(pet.component):
     """
-
+    An object containing the swath of a satellite pass. Contains the start, end, and time_interval of the satellite pass
+    as well as given ground resolution to calculate vectors with. Also contains the satellite time vector and a
+    2-D array of the azimuthal beams by row and GroundTargets populating the rows.
     """
 
     start_time = pet.properties.str()
@@ -34,7 +36,6 @@ class GroundSwath(pet.component):
         super().__init__(name, locator, implicit)
         self.time_space = None
         self.swath_beams = []
-        self.raster_fp = ""
 
     def make_raster(self):
         z = np.empty((len(self.swath_beams), len(self.swath_beams[0])))
@@ -52,7 +53,11 @@ class GroundSwath(pet.component):
 
     def calculate_swath(self, instrument, planet):
         """
-
+        Takes an instrument and planet, and uses the defined swath object parameters to calculate the detected ground
+        swath.
+        :param instrument: Instrument object to use
+        :param planet: Planet as target
+        :return: Nothing returned
         """
 
         # Create list of times to observe at
@@ -66,17 +71,18 @@ class GroundSwath(pet.component):
         # Get the number of rays to intercept with DSK in accordance with spatial resolution
         num_theta = int((2 * np.pi / self.ground_resolution) * np.average((a, b, c)))
 
-        # Iterate through the times
+        # Get positions and velocities of the satellite for the observation times
         satellite_positions, satellite_velocities = instrument.get_states(target_body_id=planet.body_id,
                                                                           times=self.time_space[:],
                                                                           reference_body=planet.reference_id)
 
-        # Create a SPICE plane with the normal as the satellite velocity originating at planet center
+        # Create the SPICE planes with the normal as the satellite velocities originating at planet center
         planes = spice.nvp2pl_vector(normal=satellite_velocities, point=[0, 0, 0])
 
-        # Calculate SPICE ellipse that intercept the SPICE plane with planet triaxial ellipsoid.
+        # Calculate SPICE ellipses that intercept the SPICE planes with planet triaxial ellipsoid.
         ellipses = spice.inedpl_vector(a=a, b=b, c=c, plane=planes)[0]
 
+        # Get the generating vectors for the SPICE ellipses
         centers, smajors, sminors = spice.el2cgv_vector(ellipse=ellipses)
 
         # Get the angles to iterate through for the spanning vectors
@@ -96,11 +102,11 @@ class GroundSwath(pet.component):
             self.swath_beams.append([GroundTarget(name="{}".format(i), x=intersect[0], y=intersect[1], z=intersect[2])
                                      for intersect in intersects])
 
-        # Calculate and check position of beam points with respect to satellite
+        # Calculate the relative positions of each GroundTarget for each beam
         relative_positions = self.point_positions_relative_to_satellite(satellite_positions=satellite_positions,
                                                                         satellite_velocities=satellite_velocities)
 
-        # Look angles
+        # Calculate the look angle of each GroundTarget for each beam
         look_angles = self.get_angles_cartesian(instrument=instrument, times=self.time_space, planet=planet,
                                                 satellite_positions=satellite_positions)
 
@@ -110,15 +116,17 @@ class GroundSwath(pet.component):
             for j in range(len(self.swath_beams[i])):
 
                 # Get groundTarget
-                groundpoint = self.swath_beams[i][j]
+                ground = self.swath_beams[i][j]
+
+                # Check if the look angle and relative position is correct
                 if ((instrument.start_look_angle < look_angles[i][j] < instrument.end_look_angle)
                         and (relative_positions[i][j] == "right")):
 
                     # Append the groundTarget to azimuthal beam
-                    azimuthal_points.append(groundpoint)
+                    azimuthal_points.append(ground)
 
                     # Get vector from groundTarget to satellite
-                    new_vector = groundpoint.get_position() - satellite_positions[i]
+                    new_vector = ground.get_position() - satellite_positions[i]
 
                     # For all points in azimuthal beam, check there are no duplicates
                     for k in range(len(azimuthal_points) - 1):
@@ -135,24 +143,27 @@ class GroundSwath(pet.component):
 
                             # Check if the iteration_vector is closer than the new vector
                             if (np.linalg.norm(iteration_position - satellite_positions[i]) <
-                                    np.linalg.norm(groundpoint.get_position() - satellite_positions[i])):
+                                    np.linalg.norm(ground.get_position() - satellite_positions[i])):
                                 # Remove newest groundTarget
                                 azimuthal_points.pop()
 
                                 # Stop loop
                                 break
 
-            # Add all accepted points in azimuthal beam to swath
+            # Replace previous beam with all accepted points
             self.swath_beams[i] = azimuthal_points
 
     def point_positions_relative_to_satellite(self, satellite_positions, satellite_velocities):
         """
-        Determine whether a point on the surface of the Earth is to the left or right of the satellite's velocity vector
-        :param satellite_positions:
-        :param satellite_velocities:
-        :return: Whether the point is to the left or right of the satellite's velocity vector
+        Determine whether a set of points on the surface of the Earth are to the left or right of the satellite's
+        velocity vectors
+        :param satellite_positions: Array of x, y, z, positions of the satellite
+        :param satellite_velocities: Array of x, y, z, velocity vectors of the satellite
+        :return: A list containing whether the points are to the left or right of their corresponding satellite velocity
+        vector
         """
 
+        # Iterate through the beams
         relative_positions_per_beam = []
         for i in range(len(self.swath_beams)):
             surface_positions = np.asarray([point.get_position() for point in self.swath_beams[i]])
@@ -160,11 +171,11 @@ class GroundSwath(pet.component):
             # Calculate vectors from satellite to point and the satellite's direction
             vectors_to_point = surface_positions - satellite_positions[i]
 
-            # Calculate the cross product of the vectors
+            # Calculate the cross products of the vectors
             # noinspection PyUnreachableCode
             cross_products = np.cross(satellite_velocities[i], vectors_to_point)
 
-            # Project cross_product onto radial vector
+            # Project cross_products onto corresponding radial vector
             radial_vector = satellite_positions[i] / np.linalg.norm(satellite_positions[i])
             projections = np.dot(cross_products, radial_vector)
 
@@ -178,41 +189,44 @@ class GroundSwath(pet.component):
                 elif projection < 0:
                     relative_positions.append("right")
 
+            # Append the relative position
             relative_positions_per_beam.append(relative_positions)
 
+        # Return the relative position 2-D array
         return relative_positions_per_beam
 
     def get_angles_cartesian(self, instrument, times, planet, satellite_positions):
         """
-        Get the angle between the pixel and the satellite in degrees.
+        Get the look angles between the GroundTargets and the satellite in degrees.
         :param instrument: instrument observer
-        :param times: time of observation
+        :param times: times of observation
         :param planet: target body
-        :param satellite_positions:
-        :return: Absolute look angle between the surface point and the satellite in degrees
+        :param satellite_positions: Array of x, y, z, positions of the satellite
+        :return: Absolute look angle between the surface points and the corresponding satellite position in degrees
         """
 
-        # Calculate the satellite intersect with the shape
+        # Calculate the satellite intersects and heights with the shape
         intersects, satellite_heights = planet.get_sub_obs_points(times=times, instrument_id=instrument.body_id)
 
-        # Calculate the distance between center and satellite intersect
+        # Calculate the distance between center and satellite intersects
         satellite_radii = np.asarray([np.linalg.norm(intersect - [0, 0, 0]) for intersect in intersects])
 
+        # Iterate through the beams
         look_angles_per_beam = []
         for i in range(len(self.swath_beams)):
             surface_positions = np.asarray([point.get_position() for point in self.swath_beams[i]])
 
-            # Get the distance between the satellite and the surface point
+            # Get the distance between the satellite and the surface points
             distances = np.asarray([np.linalg.norm(surface_position - satellite_positions[i])
                                     for surface_position in surface_positions])
 
-            # Calculate cosine of the angle
+            # Calculate cosines of the angles
             z_plus_re = satellite_heights[i] + satellite_radii[i]
             altitude = np.asarray([np.linalg.norm(surface_position - [0, 0, 0])
                                    for surface_position in surface_positions])
             cosine_look_angle = (distances ** 2 + z_plus_re ** 2 - altitude ** 2) / (2 * distances * z_plus_re)
 
-            # Use arc cosine to get the angle in radians
+            # Use arc cosine to get the angles in radians
             look_angles_radians = np.arccos(cosine_look_angle)
 
             # Convert radians to degrees
@@ -221,6 +235,7 @@ class GroundSwath(pet.component):
             # Append to list
             look_angles_per_beam.append(look_angles_degrees)
 
+        # Return the look angles 2-D array
         return look_angles_per_beam
 
     def visualize(self):

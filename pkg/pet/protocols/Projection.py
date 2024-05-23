@@ -10,7 +10,7 @@ import pet
 
 class Projection(pet.protocol, family="pet.planets"):
     """
-
+    The abstract specification for projections
     """
 
 # end of file

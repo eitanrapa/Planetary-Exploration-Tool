@@ -6,7 +6,6 @@
 # (c) 2023-2024 all rights reserved
 
 import pet
-import numpy as np
 
 
 class GroundTarget(pet.component):
@@ -24,6 +23,12 @@ class GroundTarget(pet.component):
     z.doc = "z coordinate"
 
     def get_position(self):
+        """
+        Return the x, y, z positions of the GroundTarget
+        :return: x, y, z coordinates
+        """
+
+        # Return x, y, z
         return self.x, self.y, self.z
 
 # end of file

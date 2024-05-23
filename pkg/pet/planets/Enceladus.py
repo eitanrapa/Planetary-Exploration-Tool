@@ -23,22 +23,53 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
 
     @pet.export
     def get_axes(self):
+        """
+        Return the axes of the planet
+        :return: a, b, c, Equatorial major and minor semiaxes and polar semiaxis
+        """
+
+        # Get the axes using the SPICE toolkit
         a, b, c = spice.bodvcd(bodyid=int(self.body_id), item="RADII")  # in km
+
+        # Return the axes
         return a, b, c
 
     @pet.export
     def get_surface_intersects(self, vectors):
+        """
+        Find the intersects of a set of vectors with the planet DSK
+        :param vectors: Vectors for which to find intersects
+        :return: The x, y, z intersects of the vectors with the DSK
+        """
+
+        # Retrieve the DSK handle
         handle = spice.kdata(which=0, kind="dsk")[3]
+
+        # Retrieve the DSK DLA
         dla = spice.dlabfs(handle=handle)
+
+        # Use the SPICE toolkit to calculate the intersects
         intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=vector * 10, raydir=vector - (vector * 10))[1] for
                       vector in vectors]
+
+        # Return the intersects
         return intersects
 
     @pet.export
     def get_sub_obs_points(self, times, instrument_id):
+        """
+        Get the nadir sub-observation points of the instrument with the DSK
+        :param times: Times to calculate the sub-observation point in accordance to the satellite position
+        :param instrument_id: The body ID of the instrument
+        :return: The x, y, z sub-observations points and the distance between the satellite and this observation points.
+        """
+
+        # Use the SPICE toolkit to calculate sub-observation points and vectors
         sub_points, surface_vectors = spice.subpnt_vector(method="nadir/dsk/unprioritized",
                                                  target=self.body_id, et=times, fixref=self.reference_id,
                                                  abcorr="None", obsrvr=str(instrument_id))[::2]
+
+        # Return sub-observation points and distances of vectors
         return sub_points, spice.vnorm_vector(v1=surface_vectors)
 
     @pet.export

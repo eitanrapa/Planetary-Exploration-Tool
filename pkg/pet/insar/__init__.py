@@ -8,6 +8,6 @@
 from .GroundTarget import GroundTarget as groundTarget
 from .DisplacementMap import DisplacementMap as displacementMap
 from .GroundSwath import GroundSwath as groundSwath
-from .Interferogram import Interferogram as interferogram
+from .SimpleInterferogram import SimpleInterferogram as simpleInterferogram
 
 # end of file
