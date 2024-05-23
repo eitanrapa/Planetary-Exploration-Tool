@@ -4,7 +4,6 @@
 # the pet development team
 # california institute of technology
 # (c) 2023-2024 all rights reserved
-#
 
 import pet
 
@@ -21,13 +20,13 @@ class Planet(pet.protocol, family="pet.planets"):
         """
 
     @pet.provides
-    def get_surface_intersect(self, vector):
+    def get_surface_intersects(self, vectors):
         """
 
         """
 
     @pet.provides
-    def get_sub_obs_point(self, time, instrument_id):
+    def get_sub_obs_points(self, times, instrument_id):
         """
 
         """

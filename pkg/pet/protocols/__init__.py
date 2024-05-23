@@ -8,5 +8,6 @@
 
 from .Planet import Planet as planet
 from .Instrument import Instrument as instrument
+from .Projection import Projection as projection
 
 # end of file

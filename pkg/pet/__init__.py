@@ -45,6 +45,8 @@ from . import planets
 from . import instruments
 # inSAR
 from . import insar
+# projections
+from . import projections
 
 # by convention
 __version__ = meta.version

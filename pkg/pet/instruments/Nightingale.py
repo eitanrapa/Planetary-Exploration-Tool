@@ -6,7 +6,7 @@
 # (c) 2023-2024 all rights reserved
 
 import pet
-import spiceypy as spice
+import cspyce as spice
 
 
 class Nightingale(pet.component, family="pet.instruments.nightingale", implements=pet.protocols.instrument):
@@ -27,20 +27,21 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         """
 
         # Convert time from string to Ephemeris Time
-        et = spice.str2et(time=time)
+        et = spice.str2et(str=time)
         return et
 
     @pet.export
-    def get_state(self, target_body_id, time, reference_body):
-        if isinstance(time, str):
-            et = self.convert_time(time)
+    def get_states(self, target_body_id, times, reference_body):
+        if isinstance(times[0], str):
+            ets = [self.convert_time(time=time) for time in times]
         else:
-            et = time
-        current = spice.spkez(targ=int(target_body_id), et=et, ref=reference_body, abcorr="None", obs=self.body_id)[0]
-        position = current[:3]  # in km
-        velocity = current[3:6]  # in km
+            ets = times
+        states = spice.spkez_vector(targ=int(target_body_id), et=ets, ref=reference_body, abcorr="None",
+                                    obs=self.body_id)
 
-        return position, velocity
+        positions = states[0][:, :3]  # in km
+        velocities = states[0][:, 3:6]  # in km
+        return positions, velocities
 
     @pet.export
     def plot_orbit(self, target_body_id, start_time, end_time, reference_body):

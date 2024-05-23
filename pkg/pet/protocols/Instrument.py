@@ -20,7 +20,7 @@ class Instrument(pet.protocol, family="pet.instruments"):
         """
 
     @pet.provides
-    def get_state(self, target_body_id, time, reference_body):
+    def get_states(self, target_body_id, times, reference_body):
         """
 
         """

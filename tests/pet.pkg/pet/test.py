@@ -6,16 +6,16 @@
 # (c) 2023-2024 all rights reserved
 
 import pathlib
-import spiceypy as spice
+import cspyce as spice
 import pet
 
 path = pathlib.PosixPath("/home/eitanrapa/Documents/projects/other")
-spice.furnsh(str(path / "cas_enceladus_ssd_spc_1024icq_v1.bds"))  # Topography of Enceladus
+spice.furnsh(path / "cas_enceladus_ssd_spc_1024icq_v1.bds")  # Topography of Enceladus
 spice.furnsh(str(path / "pck00011_n0066.tpc"))  # Reference frames
 spice.furnsh(str(path / "insar_6stride_26d_v7_seo.bsp"))  # Ephemeris data
 spice.furnsh(str(path / "latest_leapseconds.tls"))  # Leap seconds file
 
-gs = pet.insar.groundSwath(name="1", start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 20 15:10:40.134",
+gs = pet.insar.groundSwath(name="1", start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 20 15:10:50.134",
                              time_interval=10, ground_resolution=0.2)
 
 ins = pet.instruments.nightingale(name="nightingale", body_id=-303, start_look_angle=25, end_look_angle=35)
