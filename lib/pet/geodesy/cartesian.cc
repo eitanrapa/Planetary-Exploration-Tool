@@ -1,7 +1,11 @@
+#include <cmath>
 #include "cartesian.h"
 
-static auto pih = M_PI_2;
-static auto pi = M_PI;
+static constexpr auto pih = M_PI_2;
+static constexpr auto pi = M_PI;
+
+static constexpr auto zero = 0.0;
+static constexpr auto one = 1.0;
 
 void pet::cartesian(const TriaxialEllipsoid& te, const GeodeticPoint& gp, CartesianPoint& cp)
 //  Computes the direct transformation of geodetic to Cartesian coordinates

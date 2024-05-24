@@ -25,7 +25,7 @@ class SimpleInterferogram(pet.component):
 
         """
 
-    def get_flattened_phase(self):
+    def get_flattened_phase(self, ):
         """
 
         """

@@ -8,9 +8,12 @@ import pet
 import cspyce as spice
 from matplotlib import pyplot
 import numpy as np
-from matplotlib.colors import LightSource
-from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
+import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import matplotlib.pyplot as plt
+from matplotlib.colors import LightSource
 
 
 class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.protocols.planet):
@@ -73,10 +76,28 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         return sub_points, spice.vnorm_vector(v1=surface_vectors)
 
     @pet.export
-    def visualize_topography(self):
+    def visualize_topography(self, projection):
         """
-        Creates a visualization of the surface of Enceladus
+        Creates a visualization of the surface of Enceladus using the planet DSK
+        :return: None
         """
+
+        # Get planet axes
+        a, b, c = self.get_axes()
+
+        # Define Enceladus globe
+        img_globe = ccrs.Globe(semimajor_axis=a, semiminor_axis=c, ellipse=None)
+
+        # Create a circular map using Cylindrical projection
+        fig, ax = plt.subplots(subplot_kw={'projection': ccrs.SouthPolarStereo(central_longitude, globe=img_globe)})
+
+        # Plot the circular map
+        ax.set_global()
+
+        # Zoom in on South Pole
+        ax.set_extent([-180, 180, -90, -30], crs=ccrs.PlateCarree(globe=img_globe))
+
+        # Load the topography from DSK
         handle = spice.kdata(which=0, kind="dsk")[3]
         dla = spice.dlabfs(handle=handle)
         n_vert = spice.dskb02(handle=handle, dladsc=dla)[0]
@@ -85,24 +106,53 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         y = vertices[:, 1]
         z = vertices[:, 2]
 
-        # Define grid
-        grid_x, grid_y = np.meshgrid(np.linspace(x.min(), x.max(), 1000),
-                                     np.linspace(y.min(), y.max(), 1000))
+        # Get a reduced set of topographical points for efficiency
+        trimmed_coordinates = [(long, lat, height) for long, lat, height in geo_topo if lat < -30]
+        longitudes, latitudes, heights = zip(*trimmed_coordinates)
 
-        # Interpolate z values on the grid
-        grid_z = griddata((x, y), z, (grid_x, grid_y), method='cubic')
+        # Make a grid to down-sample the topographical map for visualization
+        n = 1000
+        extent = [-180, 180, -90, 90]
+        grid_x, grid_y = np.mgrid[extent[0]:extent[1]:n * 1j, extent[2]:extent[3]:n * 1j]
 
-        fig = pyplot.figure(figsize=(10, 7))
-        ax = pyplot.axes(projection='3d')
-        cmap = pyplot.get_cmap('terrain')
-        surf = ax.plot_surface(grid_x, grid_y, grid_z, cmap=cmap, edgecolor='none')
-        # ls = LightSource(azdeg=315, altdeg=45)
-        # rgb = ls.shade(grid.T, cmap=cmap, blend_mode='soft', vert_exag=100)
-        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-        ax.set_title('Surface plot')
-        pyplot.show()
+        # Interpolation grid
+        grid = griddata((longitudes, latitudes), heights, (grid_x, grid_y), method='cubic', fill_value=0)
 
-        return
+        # Make a light-source for topographic hillshading
+        cmap = plt.get_cmap('terrain')
+        ls = LightSource(azdeg=315, altdeg=45)
+
+        # Shade the grid with some arbitrary vertical exaggeration
+        rgb = ls.shade(grid.T, cmap=cmap, blend_mode='soft', vert_exag=100)
+
+        # Plot the grid and colorbar
+        im = ax.imshow(rgb, extent=[extent[0], extent[1], extent[3], extent[2]],
+                       transform=ccrs.PlateCarree(globe=img_globe), vmin=min(heights), vmax=max(heights), cmap=cmap)
+
+        # Add colorbar
+        plt.colorbar(im, label="Heights [m]")
+
+        # Add latitude and longitude lines
+        gl = ax.gridlines(crs=ccrs.PlateCarree(globe=img_globe), linewidth=0.5, color='black', alpha=0.5,
+                          linestyle='--', draw_labels=True)
+        gl.top_labels = True
+        gl.left_labels = True
+        gl.right_labels = True
+        gl.xlines = True
+        gl.xlocator = mticker.FixedLocator([-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180])
+        gl.ylocator = mticker.FixedLocator(
+            [-90, -80, -70, -60, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90])
+        gl.xformatter = LONGITUDE_FORMATTER
+        gl.yformatter = LATITUDE_FORMATTER
+        gl.xlabel_style = {'size': 8, 'color': 'gray'}
+        gl.ylabel_style = {'size': 8, 'color': 'grey'}
+
+        # Add labels and legend
+        ax.set_title('Topography')
+
+        # Show the plot
+        plt.savefig('/home/erapapor/kraken-bak/Enceladus-Exploration-Twin-files/coverage_maps/Topo_map',
+                    format='png', dpi=500)
 
     def visualize_deformation(self, displacements):
         """

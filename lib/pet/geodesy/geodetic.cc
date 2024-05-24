@@ -1,7 +1,11 @@
+#include <cmath>
 #include "geodetic.h"
 
-static auto pih = M_PI_2;
-static auto pi = M_PI;
+static constexpr auto pih = M_PI_2;
+static constexpr auto pi = M_PI;
+
+static constexpr auto zero = 0.0;
+static constexpr auto one = 1.0;
 
 // ---------------------------------------
 //  FUNCTIONS

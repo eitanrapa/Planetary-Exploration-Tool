@@ -8,9 +8,14 @@
 // code guard
 #pragma once
 
-// get the headers
-#include "geodesy/cartesian.h"
-#include "geodesy/geodetic.h"
+// Function declarations
+namespace pet {
+    struct TriaxialEllipsoid{
+    double a;
+    double b;
+    double c;
+    };
+}
 
 
 // end of file

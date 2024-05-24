@@ -8,9 +8,14 @@
 // code guard
 #pragma once
 
-// get the headers
-#include "geodesy/cartesian.h"
-#include "geodesy/geodetic.h"
+// Function declarations
+namespace pet {
+    struct CartesianPoint{
+    double x;
+    double y;
+    double z;
+    };
+}
 
 
 // end of file

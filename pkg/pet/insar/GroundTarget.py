@@ -31,4 +31,9 @@ class GroundTarget(pet.component):
         # Return x, y, z
         return self.x, self.y, self.z
 
+    def attach_geodetic(self):
+        """
+        Attach geodetic coordinates to the GroundTarget
+        """
+
 # end of file

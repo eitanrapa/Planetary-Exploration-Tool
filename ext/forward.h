@@ -3,10 +3,9 @@
 // the pet development team
 // (c) 2023-2024 all rights reserved
 
-// code guard
-#if !defined(pet_py_forward_h)
-#define pet_py_forward_h
 
+// code guard
+#pragma once
 
 // the {project.name} namespace
 namespace pet::py {
@@ -17,9 +16,14 @@ namespace pet::py {
     void exceptions(py::module &);
     // version info
     void version(py::module &);
+    // CartesianPoint
+    void cartesianPoint(py::module &);
+    // GeodeticPoint
+    void geodeticPoint(py::module &);
+    // TriaxialEllipsoid
+    void triaxialEllipsoid(py::module &);
+
 }
 
-
-#endif
 
 // end of file

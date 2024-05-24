@@ -3,9 +3,9 @@
 // the pet development team
 // (c) 2023-2024 all rights reserved
 
+
 // code guard
-#if !defined(pet_py_external_h)
-#define pet_py_external_h
+#pragma once
 
 // STL
 #include <string>
@@ -19,6 +19,10 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 
+// conversion code
+#include <pet/pet.h>
+
+namespace py = pybind11;
 
 // type aliases
 namespace pet::py {
@@ -33,7 +37,5 @@ namespace pet::py {
     using string_t = std::string;
 }
 
-
-#endif
 
 // end of file

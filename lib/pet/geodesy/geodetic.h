@@ -1,38 +1,16 @@
-#include <iostream>
-#include <cmath>
-#include <iomanip>
+// -*- C++ -*-
+//
+// the pet development team
+// (c) 2023-2024 all rights reserved
+//
 
-#define zero 0.0
-#define one 1.0
 
-// header guard
-#ifndef GEODETIC_H
-#define GEODETIC_H
+// code guard
+#pragma once
 
-// struct guard
-#ifndef MYSTRUCT_DEFINED
-#define MYSTRUCT_DEFINED
-
-// define structs
-struct CartesianPoint{
-double x;
-double y;
-double z;
-};
-
-struct GeodeticPoint{
-double latitude;
-double longitude;
-double height;
-};
-
-struct TriaxialEllipsoid{
-double a;
-double b;
-double c;
-};
-
-#endif // MYSTRUCT_DEFINED
+#include "CartesianPoint.h"
+#include "GeodeticPoint.h"
+#include "TriaxialEllipsoid.h"
 
 // Function declarations
 namespace pet {
@@ -45,4 +23,5 @@ namespace pet {
     int sign(double t);
 }
 
-#endif
+
+// end of file
