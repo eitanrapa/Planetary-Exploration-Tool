@@ -8,9 +8,15 @@
 import pet
 
 
-class Projection(pet.protocol, family="pet.planets"):
+class Projection(pet.protocol, family="pet.projections"):
     """
     The abstract specification for projections
     """
+
+    @pet.provides
+    def proj(self, geodetic_coordinates):
+        """
+        Provides the cartopy proj
+        """
 
 # end of file

@@ -6,55 +6,67 @@
 # (c) 2023-2024 all rights reserved
 
 import pet
-from pyproj.crs.datum import CustomDatum, CustomEllipsoid
-from pyproj import Transformer
-from pyproj import CRS
+import numpy as np
+from scipy.interpolate import griddata
+import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import matplotlib.pyplot as plt
+from matplotlib.colors import LightSource
+
 
 class BiaxialConic(pet.component, family="pet.projections.biaxialconic", implements=pet.protocols.projection):
     """
-
+    Class that represents a biaxial conic projection of geodetic coordinates
     """
 
-    latitude_first_parallel = pet.properties.float()
-    latitude_first_parallel.default = 0
-    latitude_first_parallel.doc = "First standard parallel (lat_1)"
+    central_latitude = pet.properties.float()
+    central_latitude.default = 39
+    central_latitude.doc = "Latitude of natural origin (lat_0)"
 
-    latitude_second_parallel = pet.properties.float()
-    latitude_second_parallel.default = 0
-    latitude_second_parallel.doc = "Second standard parallel (lat_2)"
+    central_longitude = pet.properties.float()
+    central_longitude.default = -96
+    central_longitude.doc = "Defines the latitude where scale is not distorted (lat_ts)"
 
-    latitude_false_origin = pet.properties.float()
-    latitude_false_origin.default = 0
-    latitude_false_origin.doc = "Latitude of projection center (lat_0)"
+    false_easting = pet.properties.float()
+    false_easting.default = 0
+    false_easting.doc = "False easting (x_0)"
 
-    longitude_false_origin = pet.properties.float()
-    longitude_false_origin.default = 0
-    longitude_false_origin.doc = "Longitude of projection center (lon_0)"
+    false_northing = pet.properties.float()
+    false_northing.default = 0
+    false_northing.doc = "False northing (y_0)"
 
-    easting_false_origin = pet.properties.float()
-    easting_false_origin.default = 0
-    easting_false_origin = "False easting (x_0)"
+    first_standard_paralell = pet.properties.float()
+    first_standard_paralell.default = 33
+    first_standard_paralell.doc = "First standard parallel latitudes"
 
-    northing_false_origin = pet.properties.float()
-    northing_false_origin.default = 0
-    northing_false_origin = "False northing (y_0)"
+    second_standard_paralell = pet.properties.float()
+    second_standard_paralell.default = 45
+    second_standard_paralell.doc = "Second standard parallel latitudes"
 
-    def __init__(self, name, locator, implicit, planet):
-        super().__init__(name, locator, implicit)
+    cutoff = pet.properties.float()
+    cutoff.default = -30
+    cutoff.doc = "Latitude of map cutoff"
+
+    @pet.export
+    def proj(self, planet):
+
         planet_axes = planet.get_axes()
-        self.axes = planet.get_axes[0], planet_axes[2]
 
-    # def transform(self, geodetic_coordinates):
-    #     ell = CustomEllipsoid(semi_major_axis=self.axes[0], semi_minor_axis=self.axes[1])
-    #     cd = CustomDatum(ellipsoid=ell)
-    #     geodetic_crs = CRS.from_string("proj="
-    #     transformer = Transformer.fr
-    #     geodetic_crs = Proj(proj="latlong",datum=cd)
-    #     albers_equal_area_proj = Proj(proj="aea", datum=cd)
-    #
-    #     x, y = transform(p1=geodetic_proj, p2=albers_equal_area_proj, x=geodetic_coordinates[:, 0], y=)
-    #
+        # Define Enceladus globe
+        img_globe = ccrs.Globe(semimajor_axis=planet_axes[0] * 1e3, semiminor_axis=planet_axes[2] * 1e3, ellipse=None)
 
+        # Create a circular map using Cylindrical projection
+        fig, ax = plt.subplots(subplot_kw={'projection': ccrs.LambertConformal(central_latitude=self.central_latitude,
+                                                                               central_longitude=self.central_longitude,
+                                                                               false_easting=self.false_easting,
+                                                                               false_northing=self.false_northing,
+                                                                               standard_parallels=
+                                                                               [self.first_standard_paralell,
+                                                                                self.second_standard_paralell],
+                                                                               cutoff=self.cutoff,
+                                                                               globe=img_globe)})
 
+        return fig, ax, img_globe
 
 # end of file

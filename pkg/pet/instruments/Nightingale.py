@@ -7,7 +7,11 @@
 
 import pet
 import cspyce as spice
+import numpy as np
+import os
+import matplotlib.pyplot as plt
 from ..ext import conversions
+from ..projections import plottingTools
 
 
 class Nightingale(pet.component, family="pet.instruments.nightingale", implements=pet.protocols.instrument):
@@ -19,7 +23,16 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
     body_id.doc = "spk file body id"
 
     start_look_angle = pet.properties.float()
+    start_look_angle.doc = ""
+
     end_look_angle = pet.properties.float()
+    end_look_angle.doc = ""
+
+    orbit_cycle = pet.properties.float()
+    orbit_cycle.doc = ""
+
+    wavelength = pet.properties.float()
+    wavelength.doc = ""
 
     @pet.export
     def convert_time(self, time):
@@ -35,24 +48,41 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         # Return ephemeris time
         return et
 
+    def convert_utc(self, et):
+        """
+
+        """
+
+        utc = spice.et2utc(et=et, format="c", prec=14)
+
+        return utc
+
     @pet.export
-    def get_states(self, target_body_id, times, reference_body):
+    def get_states(self, planet, times):
         """
         Get the states of an instrument
-        :param target_body_id: ID of the target body
+        :param planet: Target planet
         :param times: The times to get the position and velocity for
-        :param reference_body: IAU reference frame
         :return: List of positions, velocities of the instrument
         """
 
-        # If the time is a string, convert first. If not, use as ephemeris time
-        if isinstance(times[0], str):
-            ets = [self.convert_time(time=time) for time in times]
+        times = np.array(times, ndmin=1)
+        if times.ndim == 1:
+
+            # If the time is a string, convert first. If not, use as ephemeris time
+            if isinstance(times, str):
+                ets = self.convert_time(time=times)
+            else:
+                ets = times
         else:
-            ets = times
+
+            if isinstance(times[0], str):
+                ets = self.convert_time(time=times)
+            else:
+                ets = times
 
         # Get the states using SPICE toolkit
-        states = spice.spkez_vector(targ=int(target_body_id), et=ets, ref=reference_body, abcorr="None",
+        states = spice.spkez_vector(targ=int(planet.body_id), et=ets, ref=planet.reference_id, abcorr="None",
                                     obs=self.body_id)
 
         # Separate positions and velocities
@@ -72,36 +102,68 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         """
 
         # Generate the ephemeris times to look through for 1 second of temporal spacing
-        ets = [self.convert_time(time=start_time) + i for i in range(360000)]
-
-        # Get the states using the SPICE toolkit
-        states = spice.spkez_vector(targ=int(planet.body_id), et=ets, ref=planet.reference_id, abcorr="None",
-                                    obs=self.body_id)
+        ets = [self.convert_time(time=start_time) + i for i in range(162000)]  # 45 hour search
 
         # Get the positions from the states
-        positions = states[0][:, :3]  # in km
-
-        # Get the planet axes
-        planet_axes = planet.get_axes()
+        positions, velocities = self.get_states(planet=planet, times=ets)
 
         # Iterate through the positions
-        times = []
-        for i in range(len(positions) - 1):
+        times = [start_time]
+        geodetic_coordinates = np.asarray(conversions.geodetic(planet=planet, cartesian_coordinates=positions))
+
+        for i in range(len(geodetic_coordinates) - 1):
             # If the latitude cutoff is found, attach the time of the cutoff
-            if ((conversions.geodetic(planet_axes=planet_axes,
-                                      cartesian_coordinates=positions[i])[0] < latitude_cutoff) and
-                    (conversions.geodetic(planet_axes=planet_axes, cartesian_coordinates=positions[i + 1])[0] >
-                     latitude_cutoff)):
-                times.append([ets[i]])
+            if (geodetic_coordinates[i, 0] < latitude_cutoff) and (geodetic_coordinates[i + 1, 0] > latitude_cutoff):
+                times.append(self.convert_utc(ets[i]))
 
         # Return the times
         return times
 
     @pet.export
-    def plot_orbit(self, target_body_id, start_time, end_time, reference_body):
+    def plot_orbit(self, planet, projection, start_time, end_time, north_extent=90, south_extent=-90, east_extent=180,
+                   west_extent=-180, time_interval=10, return_fig=False):
         """
         Plot the orbit of the instrument
         """
-        return
+
+        # Create list of times to observe at
+        times = np.arange(self.convert_time(time=start_time), self.convert_time(time=end_time) + time_interval,
+                          time_interval)
+
+        positions, velocities = self.get_states(planet, times)
+
+        geodetic_coordinates = np.asarray(
+            conversions.geodetic(planet=planet, cartesian_coordinates=positions))
+
+        fig, ax, globe = planet.visualize_topography(projection=projection, north_extent=north_extent,
+                                                     south_extent=south_extent,
+                                                     east_extent=east_extent,
+                                                     west_extent=west_extent, return_fig=True)
+
+        fig, ax = plottingTools.scatter_plot(fig=fig, ax=ax, globe=globe,
+                                             geodetic_coordinates=geodetic_coordinates[:, :3],
+                                             north_extent=north_extent, south_extent=south_extent,
+                                             east_extent=east_extent, west_extent=west_extent)
+
+        if return_fig:
+            return fig, ax, globe
+
+        # Add labels and legend
+        ax.set_title('Orbit')
+
+        # Get the current working directory
+        current_dir = os.getcwd()
+
+        # Construct the path three directories up
+        path_three_dirs_up = os.path.abspath(os.path.join(current_dir, os.pardir, os.pardir, os.pardir))
+
+        # Define the target directory within the three-up directory
+        target_dir = os.path.join(path_three_dirs_up, 'figs')
+
+        # Define the full path to save the plot
+        full_path = os.path.join(target_dir, 'orbit.png')
+
+        # Show the plot
+        plt.savefig(fname=full_path, format='png', dpi=500)
 
 # end of file

@@ -19,10 +19,6 @@ class DisplacementMap(pet.component):
     displacement_data_path = pet.properties.str()
     displacement_data_path.doc = "path to hdf5 file containing surface displacement"
 
-    def __init__(self, name, locator, implicit, planet):
-        super().__init__(name, locator, implicit)
-        self.planet_axes = planet.get_axes()
-
     def read_displacements(self):
         """
         Returns the latitudes, longitudes, times, and cycle time of the data cubes representing the surface displacement
@@ -53,11 +49,12 @@ class DisplacementMap(pet.component):
         # Return the retrieved values
         return latitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube
 
-    def attach(self, swath, use_mid_point=False):
+    def attach(self, swath, planet, time_displacement=0, use_mid_point=False):
         """
         Attach to each GroundTarget of a GroundSwath object the displacement at that point at the time it was
         observed using a regular grid interpolation.
         :param swath: GroundSwath object containing GroundTarget objects
+        :param planet: Target planet
         :param use_mid_point: Use the middle point time of the swath as the measuring point of the displacement field
         :return: Nothing returned
         """
@@ -84,19 +81,18 @@ class DisplacementMap(pet.component):
                 cartesian_coordinates = point.x, point.y, point.z
 
                 # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
-                lat, long = conversions.geodetic(planet_axes=self.planet_axes,
-                                                 cartesian_coordinates=cartesian_coordinates)[:2]
+                lat, long = conversions.geodetic(planet=planet, cartesian_coordinates=cartesian_coordinates)[:2]
 
                 # Use mid_point if True
                 if use_mid_point:
-                    mid_index = (len(time_space) - 1) / 2
+                    mid_index = len(time_space) // 2
 
                     # Calculate the fractional time corresponding to the cycle
-                    modified_time = (time_space[mid_index] % cycle_time) / cycle_time
+                    modified_time = ((time_space[mid_index] + time_displacement) % cycle_time) / cycle_time
 
                 else:
                     # Calculate the fractional time corresponding to the cycle
-                    modified_time = (time_space[i] % cycle_time) / cycle_time
+                    modified_time = ((time_space[i] + time_displacement) % cycle_time) / cycle_time
 
                 # Attach the displacement to the point
                 point.displacement = [east_interp((long, lat, modified_time)), north_interp((long, lat, modified_time)),

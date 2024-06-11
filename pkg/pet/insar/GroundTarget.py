@@ -8,19 +8,16 @@
 import pet
 
 
-class GroundTarget(pet.component):
+class GroundTarget:
     """
     Class that represents a target point on the ground
     """
 
-    x = pet.properties.float()
-    x.doc = "x coordinate"
-
-    y = pet.properties.float()
-    y.doc = "y coordinate"
-
-    z = pet.properties.float()
-    z.doc = "z coordinate"
+    def __init__(self, x, y, z, seen):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.seen = seen
 
     def get_position(self):
         """
@@ -30,10 +27,5 @@ class GroundTarget(pet.component):
 
         # Return x, y, z
         return self.x, self.y, self.z
-
-    def attach_geodetic(self):
-        """
-        Attach geodetic coordinates to the GroundTarget
-        """
 
 # end of file
