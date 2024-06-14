@@ -6,19 +6,14 @@
 # (c) 2023-2024 all rights reserved
 
 import pet
-import numpy as np
-from scipy.interpolate import griddata
 import cartopy.crs as ccrs
-import matplotlib.ticker as mticker
-from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import matplotlib.pyplot as plt
-from matplotlib.colors import LightSource
 
 
 class BiaxialCylindrical(pet.component, family="pet.projections.biaxialcylindrical",
                          implements=pet.protocols.projection):
     """
-
+    Class that represents a biaxial cylindrical projection of geodetic coordinates
     """
 
     central_longitude = pet.properties.float()
@@ -28,6 +23,7 @@ class BiaxialCylindrical(pet.component, family="pet.projections.biaxialcylindric
     @pet.export
     def proj(self, planet):
 
+        # Get the planet axes
         planet_axes = planet.get_axes()
 
         # Define Enceladus globe

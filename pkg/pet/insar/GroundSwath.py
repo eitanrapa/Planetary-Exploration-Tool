@@ -8,12 +8,9 @@
 import pet
 import numpy as np
 import cspyce as spice
-import rasterio
 import os
 import matplotlib.pyplot as plt
 from .GroundTarget import GroundTarget
-from ..ext import conversions
-from ..projections import plottingTools
 
 
 class GroundSwath(pet.component):
@@ -31,29 +28,16 @@ class GroundSwath(pet.component):
 
     time_interval = pet.properties.float()
     time_interval.default = 10
-    time_interval.doc = "time between observations (s)"
+    time_interval.doc = "time between observations [s]"
 
     ground_resolution = pet.properties.float()
-    ground_resolution.doc = "spatial distance between observations (km)"
+    ground_resolution.doc = "spatial distance between observations [m]"
 
-    def __init__(self, name, locator, implicit):
+    def __init__(self, name, locator, implicit, planet, instrument):
         super().__init__(name, locator, implicit)
         self.time_space = None
         self.swath_beams = []
-
-    def make_raster(self):
-        z = np.empty((len(self.swath_beams), len(self.swath_beams[0])))
-        for i in range(len(self.swath_beams)):
-            for j in range(len(self.swath_beams[0])):
-                z[i][j] = self.swath_beams[i][j].z
-
-        self.raster_fp = '/tmp/new.tif'
-        new_dataset = rasterio.open(fp='/tmp/new.tif', mode='w', driver='GTiff',
-                                    height=z.shape[0], width=z.shape[1],
-                                    count=1, dtype=z.dtype, crs='+proj=cart')
-
-        new_dataset.write(z, 1)
-        new_dataset.close()
+        self.calculate_swath(planet=planet, instrument=instrument)
 
     def calculate_swath(self, instrument, planet):
         """
@@ -61,7 +45,6 @@ class GroundSwath(pet.component):
         swath.
         :param instrument: Instrument object to use
         :param planet: Planet as target
-        :return: Nothing returned
         """
 
         # Create list of times to observe at
@@ -102,7 +85,7 @@ class GroundSwath(pet.component):
             intersects = planet.get_surface_intersects(vectors=vectors)
 
             # Make groundTarget objects with the intersects
-            self.swath_beams.append([GroundTarget(x=intersect[0], y=intersect[1], z=intersect[2], seen=True) for
+            self.swath_beams.append([GroundTarget(x=intersect[0], y=intersect[1], z=intersect[2]) for
                                      intersect in intersects])
 
         # Calculate the relative positions of each GroundTarget for each beam
@@ -115,6 +98,7 @@ class GroundSwath(pet.component):
 
         # Check the beams for duplicates, look_angles, and relative positions
         for i in range(len(self.swath_beams)):
+
             azimuthal_points = []
             for j in range(len(self.swath_beams[i])):
 
@@ -147,7 +131,6 @@ class GroundSwath(pet.component):
                             # Check if the iteration_vector is closer than the new vector
                             if (np.linalg.norm(iteration_position - satellite_positions[i]) <
                                     np.linalg.norm(ground.get_position() - satellite_positions[i])):
-
                                 # Remove newest groundTarget
                                 azimuthal_points[-1].seen = False
 
@@ -161,8 +144,8 @@ class GroundSwath(pet.component):
         """
         Determine whether a set of points on the surface of the Earth are to the left or right of the satellite's
         velocity vectors
-        :param satellite_positions: Array of x, y, z, positions of the satellite
-        :param satellite_velocities: Array of x, y, z, velocity vectors of the satellite
+        :param satellite_positions: Array of x, y, z, positions of the satellite [m]
+        :param satellite_velocities: Array of x, y, z, velocity vectors of the satellite [m/s]
         :return: A list containing whether the points are to the left or right of their corresponding satellite velocity
         vector
         """
@@ -170,6 +153,7 @@ class GroundSwath(pet.component):
         # Iterate through the beams
         relative_positions_per_beam = []
         for i in range(len(self.swath_beams)):
+
             surface_positions = np.asarray([point.get_position() for point in self.swath_beams[i]])
 
             # Calculate vectors from satellite to point and the satellite's direction
@@ -242,50 +226,50 @@ class GroundSwath(pet.component):
         # Return the look angles 2-D array
         return look_angles_per_beam
 
-    def visualize(self, planet, instrument, projection, north_extent=90, south_extent=-90, east_extent=180,
-                  west_extent=-18, return_fig=False):
+    def visualize(self, projection, visualization, planet, instrument, return_fig=False):
+        """
+        Visualize the ground swath
+        :param visualization: Visualization tool to use
+        :param projection: Cartopy projection
+        :param planet: The planet to visualize as well
+        :param instrument: Instrument to visualize orbit
+        :param return_fig: Whether to return the fig, ax, globe objects
         """
 
-        """
-
+        # Create empty list of positions
         positions = []
 
+        # Get positions from swath beams
         for beam in self.swath_beams:
             for point in beam:
                 positions.append(point.get_position())
 
-        geodetic_coordinates = np.asarray(
-            conversions.geodetic(planet=planet, cartesian_coordinates=positions))
+        # Get planet axes
+        a, b, c = self.get_axes()
 
-        fig, ax, globe = instrument.plot_orbit(start_time=self.start_time, end_time=self.end_time,
-                                               time_interval=self.time_interval, planet=planet, projection=projection,
-                                               north_extent=north_extent, south_extent=south_extent,
-                                               east_extent=east_extent, west_extent=west_extent, return_fig=True)
+        # Create a coordinate conversion object
+        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
 
-        fig, ax = plottingTools.scatter_plot(fig=fig, ax=ax, globe=globe,
-                                             geodetic_coordinates=geodetic_coordinates[:, :3],
-                                             north_extent=north_extent, south_extent=south_extent,
-                                             east_extent=east_extent, west_extent=west_extent)
+        # Convert positions to geodetic coordinates
+        geodetic_coordinates = convert.geodetic(planet=planet, cartesian_coordinates=positions)
 
+        # Get the fig, ax, globe from the instrument orbit
+        fig, ax, globe = instrument.plot_orbit(visualization=visualization, projection=projection,
+                                               planet=planet, start_time=self.start_time, end_time=self.end_time,
+                                               time_interval=self.time_interval, return_fig=True)
+
+        # Use visualization tool to plot
+        fig, ax, globe = visualization.scatter_plot(fig=fig, ax=ax, globe=globe,
+                                                    geodetic_coordinates=geodetic_coordinates[:, :3])
+
+        # Return fig, ax, globe if necessary
         if return_fig:
             return fig, ax, globe
 
         # Add labels and legend
         ax.set_title('Swath')
 
-        # Get the current working directory
-        current_dir = os.getcwd()
-
-        # Construct the path three directories up
-        path_three_dirs_up = os.path.abspath(os.path.join(current_dir, os.pardir, os.pardir, os.pardir))
-
-        # Define the target directory within the three-up directory
-        target_dir = os.path.join(path_three_dirs_up, 'figs')
-
-        # Define the full path to save the plot
-        full_path = os.path.join(target_dir, 'swath.png')
-
-        # Show the plot
-        plt.savefig(fname=full_path, format='png', dpi=500)
+        # Save the plot
+        plt.savefig(fname=visualization.folder_path, format='png', dpi=500)
 
 # end of file

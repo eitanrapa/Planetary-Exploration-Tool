@@ -5,15 +5,13 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-import pet
-
 
 class GroundTarget:
     """
     Class that represents a target point on the ground
     """
 
-    def __init__(self, x, y, z, seen):
+    def __init__(self, x, y, z, seen=True):
         self.x = x
         self.y = y
         self.z = z

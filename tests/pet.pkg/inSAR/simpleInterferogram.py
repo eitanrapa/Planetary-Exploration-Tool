@@ -5,15 +5,14 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-import pathlib
-import cspyce as spice
 import pet
 
-path = pathlib.PosixPath("/home/eitanrapa/Documents/projects/other")
-spice.furnsh(path / "cas_enceladus_ssd_spc_1024icq_v1.bds")  # Topography of Enceladus
-spice.furnsh(path / "pck00011_n0066.tpc")  # Reference frames
-spice.furnsh(path / "insar_6stride_26d_v7_seo.bsp")  # Ephemeris data
-spice.furnsh(path / "latest_leapseconds.tls")  # Leap seconds file
+# Create a file manager
+fm = pet.spicetoolkit.filemanager(folder_path="/home/eitanrapa/Documents/projects/other")
+
+# Furnish some files
+fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
+                      "insar_6stride_26d_v7_seo.bsp", "latest_leapseconds.tls"])
 
 ins = pet.instruments.nightingale(name="nightingale", body_id=-303, start_look_angle=25, end_look_angle=35,
                                   orbit_cycle=110020, wavelength=0.13)
@@ -30,6 +29,6 @@ interferogram.calculate_igram(instrument=ins, planet=planet, displacements=displ
 
 # interferogram.visualize()
 
-spice.kclear()
+fm.clear()
 
 # end of file

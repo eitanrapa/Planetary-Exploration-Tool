@@ -32,7 +32,7 @@ class Planet(pet.protocol, family="pet.planets"):
         """
 
     @pet.provides
-    def visualize_topography(self):
+    def visualize_topography(self, projection, return_fig):
         """
         Creates a visualization of the surface of Enceladus
         """

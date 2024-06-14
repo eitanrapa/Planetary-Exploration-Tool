@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 class BiaxialPlanar(pet.component, family="pet.projections.biaxialplanar", implements=pet.protocols.projection):
     """
-
+    Class that represents a biaxial planar projection of geodetic coordinates
     """
 
     central_latitude = pet.properties.float()
@@ -34,6 +34,7 @@ class BiaxialPlanar(pet.component, family="pet.projections.biaxialplanar", imple
     @pet.export
     def proj(self, planet):
 
+        # Get the planet axes
         planet_axes = planet.get_axes()
 
         # Define Enceladus globe

@@ -10,8 +10,6 @@ import cspyce as spice
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from ..ext import conversions
-from ..projections import plottingTools
 
 
 class Nightingale(pet.component, family="pet.instruments.nightingale", implements=pet.protocols.instrument):
@@ -23,74 +21,109 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
     body_id.doc = "spk file body id"
 
     start_look_angle = pet.properties.float()
-    start_look_angle.doc = ""
+    start_look_angle.doc = "Starting look angle"
 
     end_look_angle = pet.properties.float()
-    end_look_angle.doc = ""
+    end_look_angle.doc = "Ending look angle"
 
     orbit_cycle = pet.properties.float()
-    orbit_cycle.doc = ""
+    orbit_cycle.doc = "Time to make one orbit"
 
     wavelength = pet.properties.float()
-    wavelength.doc = ""
+    wavelength.doc = "Radar wavelength"
 
-    @pet.export
-    def convert_time(self, time):
+    def _convert_times(self, times):
         """
         Converts a time string to Ephemeris Time using a loaded leap seconds file
-        :param time: String to be converted
+        :param times: String to be converted
         :return: Ephemeris time float
         """
 
         # Convert time from string to ephemeris time
-        et = spice.str2et(str=time)
+        ets = [spice.str2et(str=time) for time in times]
 
         # Return ephemeris time
-        return et
+        return np.asanyarray(ets)
 
-    def convert_utc(self, et):
+    @pet.export
+    def convert_times(self, times):
+        """
+        Helper function for _convert_times
         """
 
+        # Make sure times is a numpy array
+        times = np.asanyarray(times)
+
+        # Make sure dimensions is 1
+        if times.ndim == 0:
+            times = np.asanyarray([times])
+
+        # Call _Cartesian function for results
+        return self._convert_times(times=times)
+
+    def _convert_utcs(self, ets):
+        """
+        Converts ETs to time strings using the loaded leap seconds file
+        :param ets: Ephemeris times to be converted
+        :return: Time string
         """
 
-        utc = spice.et2utc(et=et, format="c", prec=14)
+        # Convert time to UTC
+        utcs = [spice.et2utc(et=et, format="c", prec=14) for et in ets]
 
-        return utc
+        # Return the strings
+        return utcs
+
+    @pet.export
+    def convert_utcs(self, ets):
+        """
+        Helper function for _convert_utcs
+        """
+
+        # Make sure times is a numpy array
+        ets = np.asanyarray(ets)
+
+        # Make sure dimensions is 1
+        if ets.ndim == 0:
+            ets = np.asanyarray([ets])
+
+        # Call _Cartesian function for results
+        return self._convert_utcs(ets=ets)
+
+    def _get_states(self, planet, times):
+        """
+         Get the states of an instrument
+         :param planet: Target planet
+         :param times: The times to get the position and velocity for
+         :return: List of positions, velocities of the instrument
+         """
+
+        # Get the states using SPICE toolkit
+        states = spice.spkez_vector(targ=int(planet.body_id), et=times, ref=planet.reference_id, abcorr="None",
+                                    obs=self.body_id)
+
+        # Separate positions and velocities, convert to meters
+        positions = np.asanyarray(states[0])[:, :3] * 1e3
+        velocities = np.asanyarray(states[0])[:, 3:6] * 1e3
+
+        # Return positions and velocities
+        return positions, velocities
 
     @pet.export
     def get_states(self, planet, times):
         """
-        Get the states of an instrument
-        :param planet: Target planet
-        :param times: The times to get the position and velocity for
-        :return: List of positions, velocities of the instrument
+        Helper function for _get_states
         """
 
-        times = np.array(times, ndmin=1)
-        if times.ndim == 1:
+        # Make sure times is a numpy array
+        times = np.asanyarray(times)
 
-            # If the time is a string, convert first. If not, use as ephemeris time
-            if isinstance(times, str):
-                ets = self.convert_time(time=times)
-            else:
-                ets = times
-        else:
-
-            if isinstance(times[0], str):
-                ets = self.convert_time(time=times)
-            else:
-                ets = times
-
-        # Get the states using SPICE toolkit
-        states = spice.spkez_vector(targ=int(planet.body_id), et=ets, ref=planet.reference_id, abcorr="None",
-                                    obs=self.body_id)
-
-        # Separate positions and velocities
-        positions = states[0][:, :3]  # in km
-        velocities = states[0][:, 3:6]  # in km
+        # Make sure dimensions is 1
+        if times.ndim == 0:
+            times = np.asanyarray([times])
 
         # Return positions and velocities
-        return positions, velocities
+        return self._get_states(planet=planet, times=times)
 
     def get_five_tracks(self, planet, latitude_cutoff=0, start_time="2046 DEC 20 15:10:40.134"):
         """
@@ -109,7 +142,15 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
 
         # Iterate through the positions
         times = [start_time]
-        geodetic_coordinates = np.asarray(conversions.geodetic(planet=planet, cartesian_coordinates=positions))
+
+        # Get planet axes
+        a, b, c = planet.get_axes()
+
+        # Create a coordinate conversion object
+        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
+
+        # Get the geodetic coordinates
+        geodetic_coordinates = np.asarray(convert.geodetic(cartesian_coordinates=positions))
 
         for i in range(len(geodetic_coordinates) - 1):
             # If the latitude cutoff is found, attach the time of the cutoff
@@ -120,50 +161,50 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         return times
 
     @pet.export
-    def plot_orbit(self, planet, projection, start_time, end_time, north_extent=90, south_extent=-90, east_extent=180,
-                   west_extent=-180, time_interval=10, return_fig=False):
+    def plot_orbit(self, visualization, projection, planet, start_time, end_time, time_interval=10, return_fig=False):
         """
         Plot the orbit of the instrument
+        :param visualization: Visualization tool to use
+        :param projection: Cartopy projection to use
+        :param planet: The planet to visualize as well
+        :param start_time: Start time of orbit plotting
+        :param end_time: End time of orbit plotting
+        :param time_interval: Time interval for plot points
+        :param return_fig: Whether to return the fig, ax, globe objects
         """
 
         # Create list of times to observe at
         times = np.arange(self.convert_time(time=start_time), self.convert_time(time=end_time) + time_interval,
                           time_interval)
 
+        # Get the positions and velocities
         positions, velocities = self.get_states(planet, times)
 
-        geodetic_coordinates = np.asarray(
-            conversions.geodetic(planet=planet, cartesian_coordinates=positions))
+        # Get planet axes
+        a, b, c = self.get_axes()
 
-        fig, ax, globe = planet.visualize_topography(projection=projection, north_extent=north_extent,
-                                                     south_extent=south_extent,
-                                                     east_extent=east_extent,
-                                                     west_extent=west_extent, return_fig=True)
+        # Create a coordinate conversion object
+        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
 
-        fig, ax = plottingTools.scatter_plot(fig=fig, ax=ax, globe=globe,
-                                             geodetic_coordinates=geodetic_coordinates[:, :3],
-                                             north_extent=north_extent, south_extent=south_extent,
-                                             east_extent=east_extent, west_extent=west_extent)
+        # Get geodetic coordinates
+        geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)
 
+        # Get fig, ax, globe from topography
+        fig, ax, globe = planet.visualize_topography(visualization=visualization,
+                                                     projection=projection, return_fig=True)
+
+        # Use visualization tool to plot
+        fig, ax, globe = visualization.scatter_plot(fig=fig, ax=ax, globe=globe,
+                                                    geodetic_coordinates=geodetic_coordinates[:, :3])
+
+        # Return fig, ax, globe if necessary
         if return_fig:
             return fig, ax, globe
 
         # Add labels and legend
         ax.set_title('Orbit')
 
-        # Get the current working directory
-        current_dir = os.getcwd()
-
-        # Construct the path three directories up
-        path_three_dirs_up = os.path.abspath(os.path.join(current_dir, os.pardir, os.pardir, os.pardir))
-
-        # Define the target directory within the three-up directory
-        target_dir = os.path.join(path_three_dirs_up, 'figs')
-
-        # Define the full path to save the plot
-        full_path = os.path.join(target_dir, 'orbit.png')
-
-        # Show the plot
-        plt.savefig(fname=full_path, format='png', dpi=500)
+        # Save the plot
+        plt.savefig(fname=visualization.folder_path, format='png', dpi=500)
 
 # end of file

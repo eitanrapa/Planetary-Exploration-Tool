@@ -14,9 +14,15 @@ class Instrument(pet.protocol, family="pet.instruments"):
     """
 
     @pet.provides
-    def convert_time(self, time):
+    def convert_times(self, times):
         """
-        Converts a time string to Ephemeris Time using a loaded leap seconds file
+        Converts time strings to Ephemeris Time using a loaded leap seconds file
+        """
+
+    @pet.provides
+    def convert_utcs(self, time):
+        """
+        Converts ETs to time strings using the loaded leap seconds file
         """
 
     @pet.provides
@@ -26,7 +32,7 @@ class Instrument(pet.protocol, family="pet.instruments"):
         """
 
     @pet.provides
-    def plot_orbit(self, target_body_id, start_time, end_time, reference_body):
+    def plot_orbit(self, visualization, planet, start_time, end_time, time_interval, return_fig):
         """
         Plot the orbit of the instrument
         """

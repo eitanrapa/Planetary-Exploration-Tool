@@ -4,11 +4,10 @@
 #
 # the pet development team
 # (c) 2023-2024 all rights reserved
-import numpy as np
+
 import pet
 import h5py
 from scipy.interpolate import RegularGridInterpolator
-from ..ext import conversions
 
 
 class DisplacementMap(pet.component):
@@ -55,6 +54,7 @@ class DisplacementMap(pet.component):
         observed using a regular grid interpolation.
         :param swath: GroundSwath object containing GroundTarget objects
         :param planet: Target planet
+        :param time_displacement: How much time to advance the model by [s]
         :param use_mid_point: Use the middle point time of the swath as the measuring point of the displacement field
         :return: Nothing returned
         """
@@ -73,6 +73,12 @@ class DisplacementMap(pet.component):
         up_interp = RegularGridInterpolator(points=(longitudes, latitudes, times),
                                             values=up_cube, method='linear', bounds_error=False, fill_value=None)
 
+        # Get planet axes
+        a, b, c = planet.get_axes()
+
+        # Create a coordinate conversion object
+        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
+
         # Populate the GroundTarget displacement values at each time
         for i in range(len(swath.swath_beams)):
             for point in swath.swath_beams[i]:
@@ -81,7 +87,7 @@ class DisplacementMap(pet.component):
                 cartesian_coordinates = point.x, point.y, point.z
 
                 # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
-                lat, long = conversions.geodetic(planet=planet, cartesian_coordinates=cartesian_coordinates)[:2]
+                lat, long = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[0, :2]
 
                 # Use mid_point if True
                 if use_mid_point:

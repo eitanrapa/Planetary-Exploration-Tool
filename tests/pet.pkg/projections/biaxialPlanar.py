@@ -5,20 +5,28 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-import cspyce as spice
 import pet
-import pathlib
 
-path = pathlib.PosixPath("/home/eitanrapa/Documents/projects/other")
-spice.furnsh(path / "cas_enceladus_ssd_spc_1024icq_v1.bds")  # Topography of Enceladus
-spice.furnsh(path / "pck00011_n0066.tpc")  # Reference frames
+# Create a file manager
+fm = pet.spicetoolkit.fileManager(folder_path="/home/eitanrapa/Documents/projects/other")
 
+# Furnish some files
+fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
+                      "insar_6stride_26d_v7_seo.bsp", "latest_leapseconds.tls"])
+
+# Make a planet
 planet = pet.planets.enceladus(name="enceladus")
 
+# Define a projection
 projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90)
 
-planet.visualize_topography(projection=projection, north_extent=-30)
+# Make a visualization tool
+visualization = pet.visualization.cartopyViz(name="cartopy tool", north_extent=-30,
+                                             folder_path="/home/eitanrapa/Documents/projects/pet/figs")
 
-spice.kclear()
+# Plot the planet topography
+planet.visualize_topography(visualization=visualization, projection=projection)
+
+fm.clear()
 
 # end of file

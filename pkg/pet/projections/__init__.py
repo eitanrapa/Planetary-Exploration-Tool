@@ -8,8 +8,5 @@
 from .BiaxialConic import BiaxialConic as biaxialConic
 from .BiaxialCylindrical import BiaxialCylindrical as biaxialCylindrical
 from .BiaxialPlanar import BiaxialPlanar as biaxialPlanar
-# from .TriaxialConic import TriaxialConic as triaxialConic
-# from .TriaxialCylindrical import TriaxialCylindrical as triaxialCylindrical
-# from .TriaxialPlanar import TriaxialPlanar as triaxialPlanar
 
 # end of file
