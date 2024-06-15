@@ -29,7 +29,7 @@ visualization = pet.visualization.cartopyViz(name="cartopy tool", north_extent=-
 
 # Plot the orbit
 ins.plot_orbit(visualization=visualization, start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 22 03:10:40.134",
-               planet=planet, projection=projection, north_extent=-30)
+               planet=planet, projection=projection)
 
 fm.clear()
 

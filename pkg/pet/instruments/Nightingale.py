@@ -135,7 +135,7 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         """
 
         # Generate the ephemeris times to look through for 1 second of temporal spacing
-        ets = [self.convert_time(time=start_time) + i for i in range(162000)]  # 45 hour search
+        ets = [self.convert_times(times=start_time)[0] + i for i in range(162000)]  # 45 hour search
 
         # Get the positions from the states
         positions, velocities = self.get_states(planet=planet, times=ets)
@@ -155,7 +155,7 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         for i in range(len(geodetic_coordinates) - 1):
             # If the latitude cutoff is found, attach the time of the cutoff
             if (geodetic_coordinates[i, 0] < latitude_cutoff) and (geodetic_coordinates[i + 1, 0] > latitude_cutoff):
-                times.append(self.convert_utc(ets[i]))
+                times.append(self.convert_utcs(ets[i])[0])
 
         # Return the times
         return times
@@ -174,14 +174,14 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         """
 
         # Create list of times to observe at
-        times = np.arange(self.convert_time(time=start_time), self.convert_time(time=end_time) + time_interval,
+        times = np.arange(self.convert_times(times=start_time), self.convert_times(times=end_time) + time_interval,
                           time_interval)
 
         # Get the positions and velocities
         positions, velocities = self.get_states(planet, times)
 
         # Get planet axes
-        a, b, c = self.get_axes()
+        a, b, c = planet.get_axes()
 
         # Create a coordinate conversion object
         convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
@@ -195,7 +195,7 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
 
         # Use visualization tool to plot
         fig, ax, globe = visualization.scatter_plot(fig=fig, ax=ax, globe=globe,
-                                                    geodetic_coordinates=geodetic_coordinates[:, :3])
+                                                    geodetic_coordinates=geodetic_coordinates[:, :3], color='black')
 
         # Return fig, ax, globe if necessary
         if return_fig:
@@ -205,6 +205,6 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         ax.set_title('Orbit')
 
         # Save the plot
-        plt.savefig(fname=visualization.folder_path, format='png', dpi=500)
+        plt.savefig(fname=visualization.folder_path + '/orbit.png', format='png', dpi=500)
 
 # end of file

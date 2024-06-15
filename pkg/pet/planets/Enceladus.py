@@ -124,6 +124,6 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         ax.set_title('Topography')
 
         # Save the plot
-        plt.savefig(fname=visualization.folder_path, format='png', dpi=500)
+        plt.savefig(fname=visualization.folder_path + '/topography.png', format='png', dpi=500)
 
 # end of file

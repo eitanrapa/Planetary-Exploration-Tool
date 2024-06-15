@@ -102,13 +102,14 @@ class CartopyViz(pet.component):
         # Return with formatting
         return fig, ax, globe
 
-    def scatter_plot(self, fig, ax, globe, geodetic_coordinates):
+    def scatter_plot(self, fig, ax, globe, geodetic_coordinates, color='black'):
         """
         Plot a scatter of values such as a swath
         :param fig: Matplotlib fig
         :param ax: Matplotlib ax
         :param globe: Cartopy globe
         :param geodetic_coordinates: geodetic coordinates to plot
+        :param color: color of scatterplot
         """
 
         # Set the extent
@@ -121,7 +122,7 @@ class CartopyViz(pet.component):
 
         # Plot points on the map
         ax.scatter(longitudes, latitudes, transform=ccrs.PlateCarree(globe=globe),
-                   color='red', marker='o', s=0.1, alpha=0.25)
+                   color=color, marker='o', s=0.1, alpha=0.25)
 
         # Add latitude and longitude lines
         gl = ax.gridlines(crs=ccrs.PlateCarree(globe=globe), linewidth=0.5, color='black', alpha=0.5,
