@@ -21,12 +21,12 @@ instrument = pet.instruments.nightingale(name="nightingale", body_id=-303, start
 planet = pet.planets.enceladus(name="enceladus")
 
 # Make a ground swath
-gs = pet.insar.groundSwath(name="1", start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 20 15:10:50.134",
-                           time_interval=10, ground_resolution=2000, planet=planet, instrument=instrument)
+gs = pet.insar.groundSwath(start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 20 15:10:50.134",
+                           time_interval=60, ground_resolution=2000, planet=planet, instrument=instrument)
 
 # Make a displacement map
 displacements = pet.insar.displacementMap(
-    name="base", displacement_data_path="/home/eitanrapa/Documents/projects/other/Simulation_Base_Results.hdf5")
+    name="base", displacement_data_path="/home/eitanrapa/Documents/projects/other/Simulation_Het_Results.hdf5")
 
 # Attach to ground swath
 displacements.attach(swath=gs, planet=planet)

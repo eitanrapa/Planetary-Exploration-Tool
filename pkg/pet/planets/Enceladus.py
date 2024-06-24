@@ -8,7 +8,6 @@ import pet
 import cspyce as spice
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 
 
 class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.protocols.planet):

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from .GroundTarget import GroundTarget
 
 
-class GroundSwath(pet.component):
+class GroundSwath:
     """
     An object containing the swath of a satellite pass. Contains the start, end, and time_interval of the satellite pass
     as well as given ground resolution to calculate vectors with. Also contains the satellite time vector and a
@@ -32,8 +32,14 @@ class GroundSwath(pet.component):
     ground_resolution = pet.properties.float()
     ground_resolution.doc = "spatial distance between observations [m]"
 
-    def __init__(self, name, locator, implicit, planet, instrument):
-        super().__init__(name, locator, implicit)
+    def __init__(self, start_time, end_time, planet, instrument, time_interval=10, ground_resolution=2000):
+        """
+
+        """
+        self.start_time = start_time
+        self.end_time = end_time
+        self.time_interval = time_interval
+        self.ground_resolution = ground_resolution
         self.time_space = None
         self.swath_beams = []
         self.calculate_swath(planet=planet, instrument=instrument)
@@ -165,7 +171,6 @@ class GroundSwath(pet.component):
         # Iterate through the beams
         intersect_booleans_per_beam = []
         for i in range(len(self.swath_beams)):
-
             # Get the surface positions per beam
             surface_positions = np.asarray([point.get_position() for point in self.swath_beams[i]])
 

@@ -9,7 +9,6 @@ import pet
 import h5py
 from scipy.interpolate import RegularGridInterpolator
 
-
 class DisplacementMap(pet.component):
     """
     Class that represents an instance of displacement values created by a Finite Element Model.
