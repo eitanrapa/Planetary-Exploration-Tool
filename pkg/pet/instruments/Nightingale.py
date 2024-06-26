@@ -9,6 +9,7 @@ import pet
 import cspyce as spice
 import numpy as np
 import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 
 
 class Nightingale(pet.component, family="pet.instruments.nightingale", implements=pet.protocols.instrument):
@@ -30,6 +31,10 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
 
     wavelength = pet.properties.float()
     wavelength.doc = "Radar wavelength"
+
+    def __init__(self, name, locator, implicit, planet):
+        super().__init__(name, locator, implicit)
+        self.planet = planet
 
     def _convert_times(self, times):
         """
@@ -89,17 +94,16 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         # Call _Cartesian function for results
         return self._convert_utcs(ets=ets)
 
-    def _get_states(self, planet, times):
+    def _get_states(self, times):
         """
          Get the states of an instrument
-         :param planet: Target planet
          :param times: The times to get the position and velocity for
          :return: List of positions, velocities of the instrument
          """
 
         # Get the states using SPICE toolkit
-        states = spice.spkez_vector(targ=int(planet.body_id), et=times, ref=planet.reference_id, abcorr="None",
-                                    obs=self.body_id)
+        states = spice.spkez_vector(targ=int(self.planet.body_id), et=times, ref=self.planet.reference_id,
+                                    abcorr="None", obs=self.body_id)
 
         # Separate positions and velocities, convert to meters
         positions = np.asanyarray(states[0])[:, :3] * 1e3
@@ -109,7 +113,7 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         return positions, velocities
 
     @pet.export
-    def get_states(self, planet, times):
+    def get_states(self, times):
         """
         Helper function for _get_states
         """
@@ -122,12 +126,11 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
             times = np.asanyarray([times])
 
         # Return positions and velocities
-        return self._get_states(planet=planet, times=times)
+        return self._get_states(times=times)
 
-    def get_five_tracks(self, planet, latitude_cutoff=0, start_time="2046 DEC 20 15:10:40.134"):
+    def get_five_tracks(self, latitude_cutoff=0, start_time="2046 DEC 20 15:10:40.134"):
         """
         Get the Nightingale first five tracks split at a given latitude cutoff
-        :param planet: Target planet
         :param latitude_cutoff: Latitude to split tracks at
         :param start_time: Start time of the tracks
         :return: Times at which the cutoffs occur
@@ -137,13 +140,13 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         ets = [self.convert_times(times=start_time)[0] + i for i in range(162000)]  # 45 hour search
 
         # Get the positions from the states
-        positions, velocities = self.get_states(planet=planet, times=ets)
+        positions, velocities = self.get_states(times=ets)
 
         # Iterate through the positions
         times = [start_time]
 
         # Get planet axes
-        a, b, c = planet.get_axes()
+        a, b, c = self.planet.get_axes()
 
         # Create a coordinate conversion object
         convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
@@ -160,12 +163,10 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         return times
 
     @pet.export
-    def plot_orbit(self, visualization, projection, planet, start_time, end_time, time_interval=10, return_fig=False):
+    def plot_orbit(self, projection, start_time, end_time, time_interval=10, return_fig=False):
         """
         Plot the orbit of the instrument
-        :param visualization: Visualization tool to use
         :param projection: Cartopy projection to use
-        :param planet: The planet to visualize as well
         :param start_time: Start time of orbit plotting
         :param end_time: End time of orbit plotting
         :param time_interval: Time interval for plot points
@@ -177,24 +178,27 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
                           time_interval)
 
         # Get the positions and velocities
-        positions, velocities = self.get_states(planet, times)
+        positions, velocities = self.get_states(times)
 
         # Get planet axes
-        a, b, c = planet.get_axes()
+        a, b, c = self.planet.get_axes()
 
         # Create a coordinate conversion object
         convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
 
         # Get geodetic coordinates
-        geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)
+        geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)[:, :3]
 
         # Get fig, ax, globe from topography
-        fig, ax, globe = planet.visualize_topography(visualization=visualization,
-                                                     projection=projection, return_fig=True)
+        fig, ax, globe = self.planet.visualize_topography(projection=projection, return_fig=True)
 
-        # Use visualization tool to plot
-        fig, ax, globe = visualization.scatter_plot(fig=fig, ax=ax, globe=globe,
-                                                    geodetic_coordinates=geodetic_coordinates[:, :3], color='black')
+        # Get the coordinates
+        coordinates = [(long, lat, height) for lat, long, height in geodetic_coordinates]
+        longitudes, latitudes, heights = zip(*coordinates)
+
+        # Plot points on the map
+        ax.scatter(longitudes, latitudes, transform=ccrs.PlateCarree(globe=globe),
+                   color='black', marker='o', s=0.1, alpha=0.25)
 
         # Return fig, ax, globe if necessary
         if return_fig:
@@ -204,6 +208,6 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         ax.set_title('Orbit')
 
         # Save the plot
-        plt.savefig(fname=visualization.folder_path + '/orbit.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/orbit.png', format='png', dpi=500)
 
 # end of file

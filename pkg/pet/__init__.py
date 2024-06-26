@@ -49,8 +49,6 @@ from . import insar
 from . import projections
 # spicetoolkit
 from . import spicetoolkit
-# visualization
-from . import visualization
 
 # by convention
 __version__ = meta.version

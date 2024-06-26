@@ -8,6 +8,9 @@ import pet
 import cspyce as spice
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import LightSource
+from scipy.interpolate import griddata
+import cartopy.crs as ccrs
 
 
 class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.protocols.planet):
@@ -82,7 +85,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         return sub_points, distances
 
     @pet.export
-    def visualize_topography(self, visualization, projection, return_fig=False):
+    def visualize_topography(self, projection, return_fig=False):
         """
         Creates a visualization of the surface of Enceladus using the planet DSK
         :param visualization: Visualization tool to use
@@ -106,23 +109,51 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
 
         # Convert coordinate vertices
-        geodetic_coordinates = convert.geodetic(cartesian_coordinates=np.asarray([x, y, z]).T)
+        geodetic_coordinates = convert.geodetic(cartesian_coordinates=np.asarray([x, y, z]).T)[:, :3]
 
         # Get the projection
         fig, ax, globe = projection.proj(planet=self)
 
-        # Use visualization tool to plot
-        fig, ax, globe = visualization.grid_plot(fig=fig, ax=ax, globe=globe,
-                                                 geodetic_coordinates=geodetic_coordinates[:, :3])
+        # Get reduced set of coordinates
+        trimmed_coordinates = [(long, lat, height) for lat, long, height in
+                               geodetic_coordinates if projection.south_extent < lat < projection.north_extent and
+                               projection.west_extent < long < projection.east_extent]
+        longitudes, latitudes, heights = zip(*trimmed_coordinates)
+
+        # Make a grid to down-sample the topographical map for visualization
+        n = 1000
+        extent = [-180, 180, -90, 90]
+        grid_x, grid_y = np.mgrid[extent[0]:extent[1]:n * 1j, extent[2]:extent[3]:n * 1j]
+
+        # Interpolation grid
+        grid = griddata((longitudes, latitudes), heights, (grid_x, grid_y), method='cubic', fill_value=0)
+
+        # Make a light-source for topographic hillshading
+        cmap = plt.get_cmap('terrain')
+        ls = LightSource(azdeg=315, altdeg=45)
+
+        # Shade the grid with some arbitrary vertical exaggeration
+        rgb = ls.shade(grid.T, cmap=cmap, blend_mode='soft', vert_exag=100)
+
+        # Plot the grid and colorbar
+        try:
+            im = ax.imshow(rgb, extent=[extent[0], extent[1], extent[3], extent[2]],
+                           transform=ccrs.PlateCarree(globe=globe), vmin=min(heights), vmax=max(heights), cmap=cmap)
+        except ValueError:
+            print("Exception: Try a smaller size plot")
+            quit()
 
         # return fig, ax, globe if necessary
         if return_fig:
             return fig, ax, globe
 
+        # Add colorbar
+        plt.colorbar(im, label="Heights [m]")
+
         # Add labels and legend
         ax.set_title('Topography')
 
         # Save the plot
-        plt.savefig(fname=visualization.folder_path + '/topography.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/topography.png', format='png', dpi=500)
 
 # end of file

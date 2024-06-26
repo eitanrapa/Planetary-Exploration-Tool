@@ -11,11 +11,10 @@ class GroundTarget:
     Class that represents a target point on the ground
     """
 
-    def __init__(self, x, y, z, seen=True):
+    def __init__(self, x, y, z):
         self.x = x
         self.y = y
         self.z = z
-        self.seen = seen
 
     def get_position(self):
         """
