@@ -9,6 +9,7 @@ import pet
 import numpy as np
 import cspyce as spice
 import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 from .GroundTarget import GroundTarget
 
 
@@ -19,53 +20,37 @@ class GroundSwath:
     2-D array of the azimuthal beams by row and GroundTargets populating the rows.
     """
 
-    start_time = pet.properties.str()
-    start_time.doc = "start time of swath"
-
-    end_time = pet.properties.str()
-    end_time.doc = "end time of swath"
-
-    time_interval = pet.properties.float()
-    time_interval.default = 10
-    time_interval.doc = "time between observations [s]"
-
-    ground_resolution = pet.properties.float()
-    ground_resolution.doc = "spatial distance between observations [m]"
-
-    def __init__(self, start_time, end_time, planet, instrument, time_interval=10, ground_resolution=2000):
-        """
-
-        """
+    def __init__(self, start_time, end_time, planet, instrument, time_interval=10, ground_resolution=2000, copy=False):
         self.start_time = start_time
         self.end_time = end_time
         self.time_interval = time_interval
         self.ground_resolution = ground_resolution
         self.time_space = None
         self.swath_beams = []
-        self.calculate_swath(planet=planet, instrument=instrument)
+        self.planet = planet
+        self.instrument = instrument
+        if copy is False:
+            self.calculate_swath()
 
-    def calculate_swath(self, instrument, planet):
+    def calculate_swath(self):
         """
         Takes an instrument and planet, and uses the defined swath object parameters to calculate the detected ground
         swath.
-        :param instrument: Instrument object to use
-        :param planet: Planet as target
         """
 
         # Create list of times to observe at
-        self.time_space = np.arange(instrument.convert_times(times=self.start_time),
-                                    instrument.convert_times(times=self.end_time) +
+        self.time_space = np.arange(self.instrument.convert_times(times=self.start_time),
+                                    self.instrument.convert_times(times=self.end_time) +
                                     self.time_interval, self.time_interval)
 
         # Get planet axes
-        a, b, c = planet.get_axes()
+        a, b, c = self.planet.get_axes()
 
         # Get the number of rays to intercept with DSK in accordance with spatial resolution
         num_theta = int((2 * np.pi / self.ground_resolution) * np.average((a, b, c)))
 
         # Get positions and velocities of the satellite for the observation times
-        satellite_positions, satellite_velocities = instrument.get_states(planet=planet,
-                                                                          times=self.time_space[:])
+        satellite_positions, satellite_velocities = self.instrument.get_states(times=self.time_space[:])
 
         # Create the SPICE planes with the normal as the satellite velocities originating at planet center
         planes = spice.nvp2pl_vector(normal=satellite_velocities, point=[0, 0, 0])
@@ -83,11 +68,12 @@ class GroundSwath:
 
         # Iterate through each azimuthal beam
         for i in range(len(self.time_space)):
+
             # Create the vectors per temporal point
             vectors = [np.cos(theta) * smajors[i] + np.sin(theta) * sminors[i] for theta in thetas]
 
             # Get the intersects with the planet DSK
-            intersects = planet.get_surface_intersects(vectors=vectors)
+            intersects = self.planet.get_surface_intersects(vectors=vectors)
 
             # Make groundTarget objects with the intersects
             self.swath_beams.append([GroundTarget(x=intersect[0], y=intersect[1], z=intersect[2]) for
@@ -98,13 +84,12 @@ class GroundSwath:
                                                                         satellite_velocities=satellite_velocities)
 
         # Calculate the look angle of each GroundTarget for each beam
-        look_angles = self.get_angles_cartesian(instrument=instrument, times=self.time_space, planet=planet,
-                                                satellite_positions=satellite_positions)
+        look_angles = self.get_angles_cartesian(times=self.time_space, satellite_positions=satellite_positions)
 
         # Calculate if the positions of the GroundTargets are past the limb point
-        limb_checks = self.check_limbs(satellite_positions=satellite_positions, planet=planet)
+        limb_checks = self.check_limbs(satellite_positions=satellite_positions)
 
-        # Check the beams for duplicates, look_angles, and relative positions
+        # Check the beams for off-limb, look_angles, and relative positions
         for i in range(len(self.swath_beams)):
 
             azimuthal_points = []
@@ -114,50 +99,24 @@ class GroundSwath:
                 ground = self.swath_beams[i][j]
 
                 # Check if the look angle and relative position is correct
-                if ((instrument.start_look_angle < look_angles[i][j] < instrument.end_look_angle)
+                if ((self.instrument.start_look_angle < look_angles[i][j] < self.instrument.end_look_angle)
                         and (relative_positions[i][j] == "right") and limb_checks[i][j] == 0):
 
                     # Append the groundTarget to azimuthal beam
                     azimuthal_points.append(ground)
 
-                    # Get vector from groundTarget to satellite
-                    new_vector = ground.get_position() - satellite_positions[i]
-
-                    # For all points in azimuthal beam, check there are no duplicates
-                    for k in range(len(azimuthal_points) - 1):
-
-                        # Get iteration position
-                        iteration_position = azimuthal_points[k].get_position()
-
-                        # Get iteration vector
-                        iteration_vector = iteration_position - satellite_positions[i]
-
-                        # Check if the vectors are on the same path
-                        if np.abs(np.dot(new_vector / np.linalg.norm(new_vector),
-                                         iteration_vector / np.linalg.norm(iteration_vector))) == 1:
-
-                            # Check if the iteration_vector is closer than the new vector
-                            if (np.linalg.norm(iteration_position - satellite_positions[i]) <
-                                    np.linalg.norm(ground.get_position() - satellite_positions[i])):
-                                # Remove newest groundTarget
-                                azimuthal_points[-1].seen = False
-
-                                # Stop loop
-                                break
-
             # Replace previous beam with all accepted points
             self.swath_beams[i] = azimuthal_points
 
-    def check_limbs(self, satellite_positions, planet):
+    def check_limbs(self, satellite_positions):
         """
         Check if all the swath_beam rays from satellite to surface positions intersect the limb ellipse.
         :param satellite_positions: Array of x, y, z, positions of the satellite [m]
-        :param planet: Planet as target
         :return: A list of values whether the points on the ground are before or after the limb point.
         """
 
         # Get planet axes
-        a, b, c = planet.get_axes()
+        a, b, c = self.planet.get_axes()
 
         # Get the limb ellipses from satellite positions
         limb_ellipses = spice.edlimb_vector(a=a, b=b, c=c, viewpt=satellite_positions)
@@ -171,6 +130,7 @@ class GroundSwath:
         # Iterate through the beams
         intersect_booleans_per_beam = []
         for i in range(len(self.swath_beams)):
+
             # Get the surface positions per beam
             surface_positions = np.asarray([point.get_position() for point in self.swath_beams[i]])
 
@@ -230,18 +190,16 @@ class GroundSwath:
         # Return the relative position 2-D array
         return relative_positions_per_beam
 
-    def get_angles_cartesian(self, instrument, times, planet, satellite_positions):
+    def get_angles_cartesian(self, times, satellite_positions):
         """
         Get the look angles between the GroundTargets and the satellite in degrees.
-        :param instrument: instrument observer
         :param times: times of observation
-        :param planet: target body
         :param satellite_positions: Array of x, y, z, positions of the satellite
         :return: Absolute look angle between the surface points and the corresponding satellite position in degrees
         """
 
         # Calculate the satellite intersects and heights with the shape
-        intersects, satellite_heights = planet.get_sub_obs_points(times=times, instrument=instrument)
+        intersects, satellite_heights = self.planet.get_sub_obs_points(times=times, instrument=self.instrument)
 
         # Calculate the distance between center and satellite intersects
         satellite_radii = np.asarray([np.linalg.norm(intersect - [0, 0, 0]) for intersect in intersects])
@@ -249,6 +207,7 @@ class GroundSwath:
         # Iterate through the beams
         look_angles_per_beam = []
         for i in range(len(self.swath_beams)):
+
             # Get surface positions per beam
             surface_positions = np.asarray([point.get_position() for point in self.swath_beams[i]])
 
@@ -274,14 +233,10 @@ class GroundSwath:
         # Return the look angles 2-D array
         return look_angles_per_beam
 
-    def visualize(self, projection, visualization, planet, instrument, return_fig=False):
+    def visualize(self, projection):
         """
         Visualize the ground swath
-        :param visualization: Visualization tool to use
         :param projection: Cartopy projection
-        :param planet: The planet to visualize as well
-        :param instrument: Instrument to visualize orbit
-        :param return_fig: Whether to return the fig, ax, globe objects
         """
 
         # Create empty list of positions
@@ -293,31 +248,31 @@ class GroundSwath:
                 positions.append(point.get_position())
 
         # Get planet axes
-        a, b, c = planet.get_axes()
+        a, b, c = self.planet.get_axes()
 
         # Create a coordinate conversion object
         convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
 
         # Convert positions to geodetic coordinates
-        geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)
+        geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)[:, :3]
 
         # Get the fig, ax, globe from the instrument orbit
-        fig, ax, globe = instrument.plot_orbit(visualization=visualization, projection=projection,
-                                               planet=planet, start_time=self.start_time, end_time=self.end_time,
-                                               time_interval=self.time_interval, return_fig=True)
+        fig, ax, globe = self.instrument.plot_orbit(projection=projection,
+                                                    start_time=self.start_time,
+                                                    end_time=self.end_time,
+                                                    time_interval=self.time_interval, return_fig=True)
+        # Get the coordinates
+        coordinates = [(long, lat, height) for lat, long, height in geodetic_coordinates]
+        longitudes, latitudes, heights = zip(*coordinates)
 
-        # Use visualization tool to plot
-        fig, ax, globe = visualization.scatter_plot(fig=fig, ax=ax, globe=globe,
-                                                    geodetic_coordinates=geodetic_coordinates[:, :3], color='red')
-
-        # Return fig, ax, globe if necessary
-        if return_fig:
-            return fig, ax, globe
+        # Plot points on the map
+        ax.scatter(longitudes, latitudes, transform=ccrs.PlateCarree(globe=globe),
+                   color='red', marker='o', s=0.1, alpha=0.25)
 
         # Add labels and legend
         ax.set_title('Swath')
 
         # Save the plot
-        plt.savefig(fname=visualization.folder_path + '/swath.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/swath.png', format='png', dpi=500)
 
 # end of file

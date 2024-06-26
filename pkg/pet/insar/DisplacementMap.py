@@ -7,7 +7,10 @@
 
 import pet
 import h5py
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 from scipy.interpolate import RegularGridInterpolator
+
 
 class DisplacementMap(pet.component):
     """
@@ -16,6 +19,10 @@ class DisplacementMap(pet.component):
 
     displacement_data_path = pet.properties.str()
     displacement_data_path.doc = "path to hdf5 file containing surface displacement"
+
+    def __init__(self, name, locator, implicit, planet):
+        super().__init__(name, locator, implicit)
+        self.planet = planet
 
     def read_displacements(self):
         """
@@ -47,12 +54,11 @@ class DisplacementMap(pet.component):
         # Return the retrieved values
         return latitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube
 
-    def attach(self, swath, planet, time_displacement=0, use_mid_point=False):
+    def attach(self, swath, time_displacement=0, use_mid_point=False):
         """
         Attach to each GroundTarget of a GroundSwath object the displacement at that point at the time it was
         observed using a regular grid interpolation.
         :param swath: GroundSwath object containing GroundTarget objects
-        :param planet: Target planet
         :param time_displacement: How much time to advance the model by [s]
         :param use_mid_point: Use the middle point time of the swath as the measuring point of the displacement field
         :return: Nothing returned
@@ -73,7 +79,7 @@ class DisplacementMap(pet.component):
                                             values=up_cube, method='linear', bounds_error=False, fill_value=None)
 
         # Get planet axes
-        a, b, c = planet.get_axes()
+        a, b, c = self.planet.get_axes()
 
         # Create a coordinate conversion object
         convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
@@ -102,5 +108,41 @@ class DisplacementMap(pet.component):
                 # Attach the displacement to the point
                 point.displacement = [east_interp((long, lat, modified_time)), north_interp((long, lat, modified_time)),
                                       up_interp((long, lat, modified_time))]
+
+    def visualize(self, time_point, projection, direction):
+        """
+        Visualize the displacement map at a specific time
+        :param time_point: Point in cycle at which to view displacements [s]
+        :param projection: Cartopy projection
+        :param direction: Vector direction to view, east, north, or up
+        """
+
+        # Get the projection
+        fig, ax, globe = projection.proj(planet=self.planet)
+
+        # Read the necessary data
+        latitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
+
+        # Visualize correct direction
+        if direction == "east":
+            im = ax.imshow(east_cube[:, :, time_point].T,
+                           extent=[-180, 180, -90, 90], transform=ccrs.PlateCarree(globe=globe))
+        elif direction == "north":
+            im = ax.imshow(north_cube[:, :, time_point].T,
+                           extent=[-180, 180, -90, 90], transform=ccrs.PlateCarree(globe=globe))
+        elif direction == "up":
+            im = ax.imshow(up_cube[:, :, time_point].T,
+                           extent=[-180, 180, -90, 90], transform=ccrs.PlateCarree(globe=globe))
+        else:
+            raise Exception("direction must be east, north, or up")
+
+        # Add a colorbar
+        plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25, label="[m]")
+
+        # Add labels and legend
+        ax.set_title('Displacements ' + direction)
+
+        # Save the plot
+        plt.savefig(fname=projection.folder_path + '/displacements_' + direction + '.png', format='png', dpi=500)
 
 # end of file

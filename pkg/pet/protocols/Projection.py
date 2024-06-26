@@ -14,7 +14,7 @@ class Projection(pet.protocol, family="pet.projections"):
     """
 
     @pet.provides
-    def proj(self, geodetic_coordinates):
+    def proj(self, planet, west_extent, east_extent, south_extent, north_extent):
         """
         Provides the cartopy proj
         """

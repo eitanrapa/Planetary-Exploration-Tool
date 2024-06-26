@@ -11,39 +11,160 @@ import cspyce as spice
 import snaphu
 import numpy as np
 import cartopy.crs as ccrs
-import matplotlib.ticker as mticker
-from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import matplotlib.pyplot as plt
-import os
-import pyre
-
+import h5py
+from .GroundTarget import GroundTarget
+from .GroundSwath import GroundSwath
 
 class SimpleInterferogram(pet.component):
     """
-
+    Class that creates a single interferogram between two points of a displacement map given an instrument orbit
     """
+
     pairing_one = pet.properties.int()
-    pairing_one.doc = ""
+    pairing_one.default = 0
+    pairing_one.doc = "First instance of track number"
 
     pairing_two = pet.properties.int()
-    pairing_two.doc = ""
+    pairing_two.default = 0
+    pairing_two.doc = "Second instance of track number"
 
     track_number = pet.properties.int()
-    track_number.doc = ""
+    track_number.default = 0
+    track_number.doc = "Track number to get first and second index of"
 
-    def __init__(self, name, locator, implicit, planet, instrument, displacements, time_interval=10,
+    def __init__(self, name, locator, implicit, planet, instrument, displacements, load_path=None, time_interval=10,
                  ground_resolution=2000, baseline=10):
         super().__init__(name, locator, implicit)
+        self.planet = planet
+        self.instrument = instrument
+        self.displacement = displacements
         self.igram = []
-        self.calculate_igram(planet=planet, instrument=instrument, displacements=displacements,
-                             time_interval=time_interval, ground_resolution=ground_resolution, baseline=baseline)
+        self.longitudes = []
+        self.latitudes = []
+        self.groundSwath = None
+        if load_path is not None:
+            self.load(load_path)
+        else:
+            self.calculate_igram(displacements=displacements,
+                                 time_interval=time_interval, ground_resolution=ground_resolution, baseline=baseline)
 
-    def get_angles_cartesian(self, instrument, time, planet, satellite_position, flat_positions):
+    def save(self, path):
+        """
+        Save the interferogram to an HDF5 file
+        :param path: Path where to save interferogram HDF5 file
+        """
+
+        # Open HDF5 file
+        f = h5py.File(name=path + '/interferogram.hdf5', mode="w")
+
+        # Get data shape
+        igram_shape = [len(row) for row in self.igram]
+
+        # Save data shape
+        f.create_dataset(name="data_shape", data=igram_shape, chunks=True)
+
+        # Flatten igram
+        flattened_igram = [item for row in self.igram for item in row]
+
+        # Save flat igram data
+        f.create_dataset(name="flattened_igram", data=flattened_igram, chunks=True)
+
+        # Flatten longitudes
+        flattened_longitudes = [item for row in self.longitudes for item in row]
+
+        # Save flat longitude data
+        f.create_dataset(name="flattened_longitudes", data=flattened_longitudes, chunks=True)
+
+        # Flatten latitudes
+        flattened_latitudes = [item for row in self.latitudes for item in row]
+
+        # Save flat latitude data
+        f.create_dataset(name="flattened_latitudes", data=flattened_latitudes, chunks=True)
+
+        # Save pairing attributes
+        f.attrs["pairing_one"] = self.pairing_one
+        f.attrs["pairing_two"] = self.pairing_two
+
+        # Save track number attribute
+        f.attrs["track_number"] = self.track_number
+
+        # Create a groundSwath group
+        grp1 = f.create_group(name="groundswath")
+
+        # Save groundSwath attributes
+        grp1.attrs["start_time"] = self.groundSwath.start_time
+        grp1.attrs["end_time"] = self.groundSwath.end_time
+        grp1.attrs["time_interval"] = self.groundSwath.time_interval
+        grp1.attrs["ground_resolution"] = self.groundSwath.ground_resolution
+
+        # Save groundSwath time space
+        grp1.create_dataset(name="time_space", data=self.groundSwath.time_space, chunks=True)
+
+        # Flatten the beams
+        flattened_beams = [item.get_position() for row in self.groundSwath.swath_beams for item in row]
+
+        # Save the beams
+        grp1.create_dataset(name="flattened_beams", data=flattened_beams, chunks=True)
+
+    def load(self, path):
+        """
+
+        """
+
+        f = h5py.File(name=path + '/interferogram.hdf5', mode='r')
+
+        data_shape = f["data_shape"]
+
+        flattened_igram = f["flattened_igram"]
+        index = 0
+        for length in data_shape:
+            self.igram.append(flattened_igram[index:index + length])
+            index += length
+
+        flattened_longitudes = f["flattened_longitudes"]
+        index = 0
+        for length in data_shape:
+            self.longitudes.append(flattened_longitudes[index:index + length])
+            index += length
+
+        flattened_latitudes = f["flattened_latitudes"]
+        index = 0
+        for length in data_shape:
+            self.latitudes.append(flattened_latitudes[index:index + length])
+            index += length
+
+        self.pairing_one = f.attrs["pairing_one"]
+        self.pairing_two = f.attrs["pairing_two"]
+        self.track_number = f.attrs["track_number"]
+
+        start_time = f["groundswath"].attrs["start_time"]
+        end_time = f["groundswath"].attrs["end_time"]
+        time_interval = f["groundswath"].attrs["time_interval"]
+        ground_resolution = f["groundswath"].attrs["ground_resolution"]
+
+        time_space = f["groundswath/time_space"]
+
+        flattened_beams = f["groundswath/flattened_beams"]
+        swath_beams = []
+        index = 0
+        for length in data_shape:
+            swath_beams.append([GroundTarget(x=element[0], y=element[1], z=element[2]) for
+                                element in flattened_beams[index:index + length]])
+            index += length
+
+        self.groundSwath = GroundSwath(start_time=start_time, end_time=end_time, time_interval=time_interval,
+                                                 ground_resolution=ground_resolution, planet=self.planet,
+                                                 instrument=self.instrument, copy=True)
+        self.groundSwath.time_space = time_space
+        self.groundSwath.swath_beams = swath_beams
+
+    def get_angles_cartesian(self, time, satellite_position, flat_positions):
         """
         """
 
         # Calculate the satellite intersect and height with the shape
-        intersect, satellite_height = planet.get_sub_obs_points(times=time, instrument=instrument)
+        intersect, satellite_height = self.planet.get_sub_obs_points(times=time, instrument=self.instrument)
 
         # Calculate the distance between center and satellite intersects
         satellite_radius = np.asarray(np.linalg.norm(intersect - [0, 0, 0]))
@@ -64,13 +185,13 @@ class SimpleInterferogram(pet.component):
         # Return the look angles 2-D array
         return look_angles_radians
 
-    def get_flattened_angles(self, positions, instrument, time, satellite_position, planet):
+    def get_flattened_angles(self, positions, time, satellite_position):
         """
 
         """
 
         # Get planet axes
-        a, b, c = planet.get_axes()
+        a, b, c = self.planet.get_axes()
 
         positions = np.asarray(positions)
         ground_satellite_vectors = positions - satellite_position
@@ -81,74 +202,12 @@ class SimpleInterferogram(pet.component):
 
         flat_points = spice.npelpt_vector(point=positions, ellips=ellipses)[0]
 
-        flat_angles = self.get_angles_cartesian(instrument=instrument, time=time, planet=planet,
+        flat_angles = self.get_angles_cartesian(time=time,
                                                 satellite_position=satellite_position, flat_positions=flat_points)
 
         return flat_angles
 
-    def make_raster(self, planet, phases, longitudes, latitudes):
-        """
-
-        """
-        planet_axes = planet.get_axes()
-
-        # Define Enceladus globe
-        img_globe = ccrs.Globe(semimajor_axis=planet_axes[0], semiminor_axis=planet_axes[2], ellipse=None)
-
-        # Create a circular map using Cylindrical projection
-        fig, ax = plt.subplots(subplot_kw={'projection': ccrs.Stereographic(central_latitude=-90, globe=img_globe)})
-
-        # Set the extent
-        ax.set_extent([-180, 180, -90, -30], crs=ccrs.PlateCarree(globe=img_globe))
-
-        # n = 1000
-        # extent = [min(longitudes), max(longitudes), min(latitudes), max(latitudes)]
-        # grid_x, grid_y = np.mgrid[extent[0]:extent[1]:n * 1j, extent[2]:extent[3]:n * 1j]
-        #
-        # # Interpolation grid
-        # grid = griddata((longitudes, latitudes), phases, (grid_x, grid_y), method='cubic', fill_value=0)
-
-        cm = plt.cm.get_cmap('hsv')
-
-        for i in range(len(phases)):
-            # Plot points on the map
-            im = ax.scatter(longitudes[i], latitudes[i], vmin=0, vmax=2 * np.pi, cmap=cm,
-                            transform=ccrs.PlateCarree(globe=img_globe), c=phases[i], marker='o', s=0.1)
-
-        # Add colorbar
-        plt.colorbar(im, label="Phase")
-
-        # Add latitude and longitude lines
-        gl = ax.gridlines(crs=ccrs.PlateCarree(globe=img_globe), linewidth=0.5, color='black', alpha=0.5,
-                          linestyle='--', draw_labels=True)
-        gl.top_labels = True
-        gl.left_labels = True
-        gl.right_labels = True
-        gl.xlines = True
-        gl.xlocator = mticker.FixedLocator([-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180])
-        gl.ylocator = mticker.FixedLocator(
-            [-90, -80, -70, -60, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90])
-        gl.xformatter = LONGITUDE_FORMATTER
-        gl.yformatter = LATITUDE_FORMATTER
-        gl.xlabel_style = {'size': 8, 'color': 'gray'}
-        gl.ylabel_style = {'size': 8, 'color': 'grey'}
-
-        # Get the current working directory
-        current_dir = os.getcwd()
-
-        # Construct the path three directories up
-        path_three_dirs_up = os.path.abspath(os.path.join(current_dir, os.pardir, os.pardir, os.pardir))
-
-        # Define the target directory within the three-up directory
-        target_dir = os.path.join(path_three_dirs_up, 'figs')
-
-        # Define the full path to save the plot
-        full_path = os.path.join(target_dir, 'test.png')
-
-        # Show the plot
-        plt.savefig(fname=full_path, format='png', dpi=500)
-
-    def calculate_flattened_phases(self, instrument, planet, ground_swath1, ground_swath2, baseline):
+    def calculate_flattened_phases(self, ground_swath1, ground_swath2, baseline):
         """
 
         """
@@ -158,7 +217,7 @@ class SimpleInterferogram(pet.component):
         total_phases = []
 
         # Get planet axes
-        a, b, c = planet.get_axes()
+        a, b, c = self.planet.get_axes()
 
         # Create a coordinate conversion object
         convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
@@ -167,15 +226,12 @@ class SimpleInterferogram(pet.component):
 
             positions = np.asarray([point.get_position() for point in ground_swath1.swath_beams[i]])
 
-            seen_values = np.asarray([point.seen for point in ground_swath1.swath_beams[i]])
-
             geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)[:, :3]
 
-            satellite_position, sat_velocity = instrument.get_states(planet=planet, times=ground_swath1.time_space[i])
+            satellite_position, sat_velocity = self.instrument.get_states(times=ground_swath1.time_space[i])
 
-            angles = self.get_flattened_angles(positions=positions, instrument=instrument,
-                                               time=ground_swath1.time_space[i],
-                                               satellite_position=satellite_position, planet=planet)
+            angles = self.get_flattened_angles(positions=positions, time=ground_swath1.time_space[i],
+                                               satellite_position=satellite_position)
 
             geodetic_heights = spice.nearpt_vector(positn=positions, a=a, b=b, c=c)[1]
 
@@ -196,73 +252,69 @@ class SimpleInterferogram(pet.component):
                             for displacement, ground_satellite_vector
                             in zip(displacements_2, ground_satellite_vectors)]))
 
-            phases = 4 * np.pi * (1 / instrument.wavelength) * (
+            phases = 4 * np.pi * (1 / self.instrument.wavelength) * (
                     (los_displacements2 - los_displacements1) -
                     ((baseline * geodetic_heights) /
                      (distances * np.sin(angles))))
 
             for k in range(len(phases)):
                 phases[k] = np.fmod(phases[k], 2 * np.pi)
-                if not seen_values[k]:
-                    phases[k] = np.nan
-                elif phases[k] < 0:
+                if phases[k] < 0:
                     phases[k] = phases[k] + (2 * np.pi)
 
             total_phases = np.concatenate((total_phases, phases))
             latitudes = np.concatenate((latitudes, geodetic_coordinates[:, 0]))
             longitudes = np.concatenate((longitudes, geodetic_coordinates[:, 1]))
 
-        self.make_raster(phases=total_phases, planet=planet, longitudes=longitudes, latitudes=latitudes)
+        self.igram = total_phases
+        self.longitudes = longitudes
+        self.latitudes = latitudes
 
-    def calculate_igram(self, planet, instrument, displacements, time_interval, ground_resolution, baseline):
+    def calculate_igram(self, displacements, time_interval, ground_resolution, baseline):
         """
 
         """
 
-        timer = pyre.timers.cpu(name="timer 1")
-        timer.start()
+        times = self.instrument.get_five_tracks()
 
-        times = instrument.get_five_tracks(planet)
+        orbit_cycle_time = self.instrument.orbit_cycle
 
-        timer.stop()
-        print(f"Get five tracks: {timer.ms()} ms")
-
-        timer.reset()
-        timer.start()
-
-        orbit_cycle_time = instrument.orbit_cycle
-
-        gs1 = pet.insar.groundSwath(start_time=times[self.track_number - 1],
+        gs1 = GroundSwath(start_time=times[self.track_number - 1],
                                     end_time=times[self.track_number], time_interval=time_interval,
-                                    ground_resolution=ground_resolution, planet=planet, instrument=instrument)
+                                    ground_resolution=ground_resolution, planet=self.planet,
+                                    instrument=self.instrument)
 
-        timer.stop()
-        print(f"Get ground swath: {timer.ms()} ms")
+        self.groundSwath = gs1
+
+        gs2 = copy.copy(gs1)
+
+        displacements.attach(swath=gs1, use_mid_point=True)
+
+        displacements.attach(swath=gs2, use_mid_point=True, time_displacement=orbit_cycle_time)
+
+        self.calculate_flattened_phases(ground_swath1=gs1, ground_swath2=gs2, baseline=baseline)
+
+    def recalculate_igram(self, baseline):
+        """
+
+        """
+
+        orbit_cycle_time = self.instrument.orbit_cycle
+
+        gs1 = self.groundSwath
 
         gs2 = copy.deepcopy(gs1)
 
-        timer.reset()
-        timer.start()
+        self.displacements.attach(swath=gs1, use_mid_point=True)
 
-        displacements.attach(swath=gs1, planet=planet, use_mid_point=True)
+        self.displacements.attach(swath=gs2, use_mid_point=True, time_displacement=orbit_cycle_time)
 
-        displacements.attach(swath=gs2, planet=planet, use_mid_point=True, time_displacement=orbit_cycle_time)
-
-        timer.stop()
-        print(f"Attach displacements: {timer.ms()} ms")
-
-        timer.reset()
-        timer.start()
-
-        self.calculate_flattened_phases(instrument=instrument, planet=planet, ground_swath1=gs1, ground_swath2=gs2,
-                                        baseline=baseline)
-
-        timer.stop()
-        print(f"Calculate phases: {timer.ms()} ms")
-
-        timer.reset()
+        self.calculate_flattened_phases(ground_swath1=gs1, ground_swath2=gs2, baseline=baseline)
 
     def unwrap(self):
+        """
+
+        """
 
         # Sample coherence for an interferogram with no noise.
         corr = np.ones(self.igram.shape, dtype=np.float32)
@@ -272,14 +324,32 @@ class SimpleInterferogram(pet.component):
 
         return unw, conncomp
 
-    def visualize(self):
+    def visualize(self, projection):
         """
 
         """
-        # Convert the irregular list of lists into a regular grid
-        plt.figure(figsize=(8, 6))
-        plt.imshow(self.igram, cmap='hsv', edgecolors='k')
-        plt.colorbar(label='Phase (radians)')
-        plt.show()
+
+        # Get the fig, ax, globe from the instrument orbit
+        fig, ax, globe = self.instrument.plot_orbit(projection=projection,
+                                                    start_time=self.groundSwath.start_time,
+                                                    end_time=self.groundSwath.end_time,
+                                                    time_interval=self.groundSwath.time_interval, return_fig=True)
+
+        cm = plt.cm.get_cmap('hsv')
+
+        for i in range(len(self.igram)):
+
+            # Plot points on the map
+            im = ax.scatter(self.longitudes[i], self.latitudes[i], vmin=0, vmax=2 * np.pi, cmap=cm,
+                            transform=ccrs.PlateCarree(globe=globe), c=self.igram[i], marker='o', s=0.1)
+
+        # Add colorbar
+        plt.colorbar(im, label="Phase")
+
+        # Add labels and legend
+        ax.set_title('Interferogram')
+
+        # Save the plot
+        plt.savefig(fname=projection.folder_path + '/interferogram.png', format='png', dpi=500)
 
 # end of file
