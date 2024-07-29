@@ -16,6 +16,7 @@ import h5py
 from .GroundTarget import GroundTarget
 from .GroundSwath import GroundSwath
 
+
 class SimpleInterferogram(pet.component):
     """
     Class that creates a single interferogram between two points of a displacement map given an instrument orbit
@@ -38,7 +39,7 @@ class SimpleInterferogram(pet.component):
         super().__init__(name, locator, implicit)
         self.planet = planet
         self.instrument = instrument
-        self.displacement = displacements
+        self.displacements = displacements
         self.igram = []
         self.longitudes = []
         self.latitudes = []
@@ -46,8 +47,7 @@ class SimpleInterferogram(pet.component):
         if load_path is not None:
             self.load(load_path)
         else:
-            self.calculate_igram(displacements=displacements,
-                                 time_interval=time_interval, ground_resolution=ground_resolution, baseline=baseline)
+            self.calculate_igram(time_interval=time_interval, ground_resolution=ground_resolution, baseline=baseline)
 
     def save(self, path):
         """
@@ -154,8 +154,8 @@ class SimpleInterferogram(pet.component):
             index += length
 
         self.groundSwath = GroundSwath(start_time=start_time, end_time=end_time, time_interval=time_interval,
-                                                 ground_resolution=ground_resolution, planet=self.planet,
-                                                 instrument=self.instrument, copy=True)
+                                       ground_resolution=ground_resolution, planet=self.planet,
+                                       instrument=self.instrument, copy=True)
         self.groundSwath.time_space = time_space
         self.groundSwath.swath_beams = swath_beams
 
@@ -207,6 +207,21 @@ class SimpleInterferogram(pet.component):
 
         return flat_angles
 
+    def enu_to_cartesian_vector(self, east, north, up, longitude, latitude):
+        """
+
+        """
+        longitude = np.deg2rad(longitude)
+        latitude = np.deg2rad(latitude)
+
+        c_matrix = [
+            [-1 * np.sin(longitude), -1 * np.sin(latitude) * np.cos(longitude), np.cos(latitude) * np.cos(longitude)],
+            [np.cos(longitude), -1 * np.sin(latitude) * np.sin(longitude), np.cos(latitude) * np.sin(longitude)],
+            [0, np.cos(latitude), np.sin(latitude)]]
+        conversion = np.matmul(c_matrix, [east, north, up])
+
+        return conversion
+
     def calculate_flattened_phases(self, ground_swath1, ground_swath2, baseline):
         """
 
@@ -219,58 +234,70 @@ class SimpleInterferogram(pet.component):
         # Get planet axes
         a, b, c = self.planet.get_axes()
 
-        # Create a coordinate conversion object
-        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
-
         for i in range(len(ground_swath1.swath_beams)):
+            # positions = np.asarray([point.get_position() for point in ground_swath1.swath_beams[i]])
+            #
+            # satellite_position, sat_velocity = self.instrument.get_states(times=ground_swath1.time_space[i])
+            #
+            # angles = self.get_flattened_angles(positions=positions, time=ground_swath1.time_space[i],
+            #                                    satellite_position=satellite_position)
 
-            positions = np.asarray([point.get_position() for point in ground_swath1.swath_beams[i]])
+            # geodetic_heights = spice.nearpt_vector(positn=positions, a=a, b=b, c=c)[1]
 
-            geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)[:, :3]
+            # distances = np.asarray([np.linalg.norm(position - [0, 0, 0]) for position in positions])
 
-            satellite_position, sat_velocity = self.instrument.get_states(times=ground_swath1.time_space[i])
-
-            angles = self.get_flattened_angles(positions=positions, time=ground_swath1.time_space[i],
-                                               satellite_position=satellite_position)
-
-            geodetic_heights = spice.nearpt_vector(positn=positions, a=a, b=b, c=c)[1]
-
-            distances = np.asarray([np.linalg.norm(position - [0, 0, 0]) for position in positions])
-
-            ground_satellite_vectors = satellite_position - positions
+            # ground_satellite_vectors = satellite_position - positions
 
             displacements_1 = [point.displacement for point in ground_swath1.swath_beams[i]]
 
-            los_displacements1 = (
-                np.asarray([np.dot(displacement, ground_satellite_vector) / np.linalg.norm(ground_satellite_vector)
-                            for displacement, ground_satellite_vector
-                            in zip(displacements_1, ground_satellite_vectors)]))
-
             displacements_2 = [point.displacement for point in ground_swath2.swath_beams[i]]
-            los_displacements2 = (
-                np.asarray([np.dot(displacement, ground_satellite_vector) / np.linalg.norm(ground_satellite_vector)
-                            for displacement, ground_satellite_vector
-                            in zip(displacements_2, ground_satellite_vectors)]))
 
-            phases = 4 * np.pi * (1 / self.instrument.wavelength) * (
-                    (los_displacements2 - los_displacements1) -
-                    ((baseline * geodetic_heights) /
-                     (distances * np.sin(angles))))
+            # los_displacements1 = (
+            #     np.asarray(
+            #         [np.linalg.norm((np.dot(self.enu_to_cartesian_vector(east=displacement[0], north=displacement[1],
+            #                                                              up=displacement[2],
+            #                                                              latitude=displacement[3],
+            #                                                              longitude=displacement[4]),
+            #                                 ground_satellite_vector) / np.linalg.norm(
+            #             ground_satellite_vector) ** 2) * ground_satellite_vector)
+            #          for displacement, ground_satellite_vector
+            #          in zip(displacements_1, ground_satellite_vectors)]))
+            #
+            # los_displacements2 = (
+            #     np.asarray(
+            #         [np.linalg.norm((np.dot(self.enu_to_cartesian_vector(east=displacement[0], north=displacement[1],
+            #                                                              up=displacement[2],
+            #                                                              latitude=displacement[3],
+            #                                                              longitude=displacement[4]),
+            #                                 ground_satellite_vector) / np.linalg.norm(
+            #             ground_satellite_vector) ** 2) * ground_satellite_vector)
+            #          for displacement, ground_satellite_vector
+            #          in zip(displacements_2, ground_satellite_vectors)]))
 
-            for k in range(len(phases)):
-                phases[k] = np.fmod(phases[k], 2 * np.pi)
-                if phases[k] < 0:
-                    phases[k] = phases[k] + (2 * np.pi)
+            # phases = 4 * np.pi * (1 / self.instrument.wavelength) * (
+            #         (los_displacements2 - los_displacements1) -
+            #         ((baseline * geodetic_heights) /
+            #          (distances * np.sin(angles))))
 
-            total_phases = np.concatenate((total_phases, phases))
-            latitudes = np.concatenate((latitudes, geodetic_coordinates[:, 0]))
-            longitudes = np.concatenate((longitudes, geodetic_coordinates[:, 1]))
+            # for k in range(len(phases)):
+            #     phases[k] = np.fmod(phases[k], 2 * np.pi)
+            #     if phases[k] < 0:
+            #         phases[k] = phases[k] + (2 * np.pi)
+
+            phases = [np.linalg.norm(self.enu_to_cartesian_vector(east=displacement_1[0], north=displacement_1[1],
+                                                                  up=displacement_1[2], latitude=displacement_1[3],
+                                                                  longitude=displacement_1[4]))
+                      for displacement_1, displacement_2 in zip(displacements_1, displacements_2)]
+
+            total_phases.append(phases)
+            latitudes.append([displacement[3] for displacement in displacements_1])
+            longitudes.append([displacement[4] for displacement in displacements_1])
 
         self.igram = total_phases
         self.longitudes = longitudes
         self.latitudes = latitudes
 
-    def calculate_igram(self, displacements, time_interval, ground_resolution, baseline):
+    def calculate_igram(self, time_interval, ground_resolution, baseline):
         """
 
         """
@@ -279,20 +306,25 @@ class SimpleInterferogram(pet.component):
 
         orbit_cycle_time = self.instrument.orbit_cycle
 
-        gs1 = GroundSwath(start_time=times[self.track_number - 1],
-                                    end_time=times[self.track_number], time_interval=time_interval,
-                                    ground_resolution=ground_resolution, planet=self.planet,
-                                    instrument=self.instrument)
+        self.groundSwath = GroundSwath(start_time=times[self.track_number - 1],
+                                       end_time=times[self.track_number], time_interval=time_interval,
+                                       ground_resolution=ground_resolution, planet=self.planet,
+                                       instrument=self.instrument)
 
-        self.groundSwath = gs1
+        gs2 = GroundSwath(start_time=self.groundSwath.start_time,
+                          end_time=self.groundSwath.end_time, time_interval=self.groundSwath.time_interval,
+                          ground_resolution=self.groundSwath.ground_resolution, planet=self.planet,
+                          instrument=self.instrument,
+                          copy=True)
 
-        gs2 = copy.copy(gs1)
+        gs2.swath_beams = copy.deepcopy(self.groundSwath.swath_beams)
 
-        displacements.attach(swath=gs1, use_mid_point=True)
+        gs2.time_space = self.groundSwath.time_space
 
-        displacements.attach(swath=gs2, use_mid_point=True, time_displacement=orbit_cycle_time)
+        self.displacements.attach(swath1=self.groundSwath, swath2=gs2, use_mid_point=True,
+                                  time_displacement=orbit_cycle_time)
 
-        self.calculate_flattened_phases(ground_swath1=gs1, ground_swath2=gs2, baseline=baseline)
+        self.calculate_flattened_phases(ground_swath1=self.groundSwath, ground_swath2=gs2, baseline=baseline)
 
     def recalculate_igram(self, baseline):
         """
@@ -301,15 +333,20 @@ class SimpleInterferogram(pet.component):
 
         orbit_cycle_time = self.instrument.orbit_cycle
 
-        gs1 = self.groundSwath
+        gs2 = GroundSwath(start_time=self.groundSwath.start_time,
+                          end_time=self.groundSwath.end_time, time_interval=self.groundSwath.time_interval,
+                          ground_resolution=self.groundSwath.ground_resolution, planet=self.planet,
+                          instrument=self.instrument,
+                          copy=True)
 
-        gs2 = copy.deepcopy(gs1)
+        gs2.swath_beams = copy.deepcopy(self.groundSwath.swath_beams)
 
-        self.displacements.attach(swath=gs1, use_mid_point=True)
+        gs2.time_space = self.groundSwath.time_space
 
-        self.displacements.attach(swath=gs2, use_mid_point=True, time_displacement=orbit_cycle_time)
+        self.displacements.attach(swath1=self.groundSwath, swath2=gs2, use_mid_point=True,
+                                  time_displacement=orbit_cycle_time)
 
-        self.calculate_flattened_phases(ground_swath1=gs1, ground_swath2=gs2, baseline=baseline)
+        self.calculate_flattened_phases(ground_swath1=self.groundSwath, ground_swath2=gs2, baseline=baseline)
 
     def unwrap(self):
         """
@@ -337,10 +374,14 @@ class SimpleInterferogram(pet.component):
 
         cm = plt.cm.get_cmap('hsv')
 
-        for i in range(len(self.igram)):
+        # for i in range(len(self.igram)):
+        #     # Plot points on the map
+        #     im = ax.scatter(self.longitudes[i], self.latitudes[i], vmin=0, vmax=2 * np.pi, cmap=cm,
+        #                     transform=ccrs.PlateCarree(globe=globe), c=self.igram[i], marker='o', s=0.1)
 
+        for i in range(len(self.igram)):
             # Plot points on the map
-            im = ax.scatter(self.longitudes[i], self.latitudes[i], vmin=0, vmax=2 * np.pi, cmap=cm,
+            im = ax.scatter(self.longitudes[i], self.latitudes[i],
                             transform=ccrs.PlateCarree(globe=globe), c=self.igram[i], marker='o', s=0.1)
 
         # Add colorbar

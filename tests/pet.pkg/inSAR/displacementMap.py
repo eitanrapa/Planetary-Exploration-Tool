@@ -26,13 +26,22 @@ displacements = pet.insar.displacementMap(
 projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
                                              folder_path="/home/eitanrapa/Documents/projects/pet/figs")
 
-# Visualize displacements
-displacements.visualize(projection=projection, time_point=0, direction="east")
+# # Visualize displacements
+# displacements.visualize(projection=projection, time_point=1482219658.317582, direction="east")
+#
+# # Visualize displacements
+# displacements.visualize(projection=projection, time_point=1482219658.317582, direction="north")
+#
+# # Visualize displacements
+# displacements.visualize(projection=projection, time_point=1482219658.317582, direction="up")
 
 # Visualize displacements
-displacements.visualize(projection=projection, time_point=0, direction="north")
+displacements.visualize(projection=projection, time_point=1482219658.317582 + 110020, direction="east")
 
 # Visualize displacements
-displacements.visualize(projection=projection, time_point=0, direction="up")
+displacements.visualize(projection=projection, time_point=1482219658.317582 + 110020, direction="north")
+
+# Visualize displacements
+displacements.visualize(projection=projection, time_point=1482219658.317582 + 110020, direction="up")
 
 # end of file
