@@ -26,8 +26,8 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
     end_look_angle = pet.properties.float()
     end_look_angle.doc = "Ending look angle"
 
-    orbit_cycle = pet.properties.float()
-    orbit_cycle.doc = "Time to make one orbit"
+    start_time = pet.properties.str()
+    start_time.doc = "Start time of coverage"
 
     wavelength = pet.properties.float()
     wavelength.doc = "Radar wavelength"
@@ -35,6 +35,8 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
     def __init__(self, name, locator, implicit, planet):
         super().__init__(name, locator, implicit)
         self.planet = planet
+        times = self.convert_times(self.get_five_tracks(latitude_cutoff=0))
+        self.orbit_cycle = times[6] - times[1]
 
     def _convert_times(self, times):
         """
@@ -128,22 +130,21 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         # Return positions and velocities
         return self._get_states(times=times)
 
-    def get_five_tracks(self, latitude_cutoff=0, start_time="2046 DEC 20 15:10:40.134"):
+    def get_five_tracks(self, latitude_cutoff=0):
         """
         Get the Nightingale first five tracks split at a given latitude cutoff
         :param latitude_cutoff: Latitude to split tracks at
-        :param start_time: Start time of the tracks
         :return: Times at which the cutoffs occur
         """
 
         # Generate the ephemeris times to look through for 1 second of temporal spacing
-        ets = [self.convert_times(times=start_time)[0] + i for i in range(162000)]  # 45 hour search
+        ets = [self.convert_times(times=self.start_time)[0] + i for i in range(162000)]  # 45 hour search
 
         # Get the positions from the states
         positions, velocities = self.get_states(times=ets)
 
         # Iterate through the positions
-        times = [start_time]
+        times = [self.start_time]
 
         # Get planet axes
         a, b, c = self.planet.get_axes()
