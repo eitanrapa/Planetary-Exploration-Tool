@@ -207,20 +207,19 @@ class SimpleInterferogram(pet.component):
 
         return flat_angles
 
-    def enu_to_cartesian_vector(self, east, north, up, longitude, latitude):
+    def enu_to_cartesian_vector(self, east, north, up, latitude, longitude):
         """
 
         """
         longitude = np.deg2rad(longitude)
         latitude = np.deg2rad(latitude)
 
-        c_matrix = [
-            [-1 * np.sin(longitude), -1 * np.sin(latitude) * np.cos(longitude), np.cos(latitude) * np.cos(longitude)],
-            [np.cos(longitude), -1 * np.sin(latitude) * np.sin(longitude), np.cos(latitude) * np.sin(longitude)],
-            [0, np.cos(latitude), np.sin(latitude)]]
-        conversion = np.matmul(c_matrix, [east, north, up])
+        t = np.cos(latitude) * up - np.sin(latitude) * north
+        w = np.sin(latitude) * up + np.cos(latitude) * north
+        u = np.cos(longitude) * t - np.sin(longitude) * east
+        v = np.sin(longitude) * t + np.cos(longitude) * east
 
-        return conversion
+        return [u, v, w]
 
     def calculate_flattened_phases(self, ground_swath1, ground_swath2, baseline):
         """
@@ -235,59 +234,42 @@ class SimpleInterferogram(pet.component):
         a, b, c = self.planet.get_axes()
 
         for i in range(len(ground_swath1.swath_beams)):
-            # positions = np.asarray([point.get_position() for point in ground_swath1.swath_beams[i]])
-            #
-            # satellite_position, sat_velocity = self.instrument.get_states(times=ground_swath1.time_space[i])
-            #
-            # angles = self.get_flattened_angles(positions=positions, time=ground_swath1.time_space[i],
-            #                                    satellite_position=satellite_position)
+            positions = np.asarray([point.get_position() for point in ground_swath1.swath_beams[i]])
 
-            # geodetic_heights = spice.nearpt_vector(positn=positions, a=a, b=b, c=c)[1]
+            satellite_position, sat_velocity = self.instrument.get_states(times=ground_swath1.time_space[i])
 
-            # distances = np.asarray([np.linalg.norm(position - [0, 0, 0]) for position in positions])
+            angles = self.get_flattened_angles(positions=positions, time=ground_swath1.time_space[i],
+                                               satellite_position=satellite_position)
 
-            # ground_satellite_vectors = satellite_position - positions
+            geodetic_heights = spice.nearpt_vector(positn=positions, a=a, b=b, c=c)[1]
+
+            distances = np.asarray([np.linalg.norm(position - [0, 0, 0]) for position in positions])
+
+            ground_satellite_vectors = satellite_position - positions
 
             displacements_1 = [point.displacement for point in ground_swath1.swath_beams[i]]
 
             displacements_2 = [point.displacement for point in ground_swath2.swath_beams[i]]
 
-            # los_displacements1 = (
-            #     np.asarray(
-            #         [np.linalg.norm((np.dot(self.enu_to_cartesian_vector(east=displacement[0], north=displacement[1],
-            #                                                              up=displacement[2],
-            #                                                              latitude=displacement[3],
-            #                                                              longitude=displacement[4]),
-            #                                 ground_satellite_vector) / np.linalg.norm(
-            #             ground_satellite_vector) ** 2) * ground_satellite_vector)
-            #          for displacement, ground_satellite_vector
-            #          in zip(displacements_1, ground_satellite_vectors)]))
-            #
-            # los_displacements2 = (
-            #     np.asarray(
-            #         [np.linalg.norm((np.dot(self.enu_to_cartesian_vector(east=displacement[0], north=displacement[1],
-            #                                                              up=displacement[2],
-            #                                                              latitude=displacement[3],
-            #                                                              longitude=displacement[4]),
-            #                                 ground_satellite_vector) / np.linalg.norm(
-            #             ground_satellite_vector) ** 2) * ground_satellite_vector)
-            #          for displacement, ground_satellite_vector
-            #          in zip(displacements_2, ground_satellite_vectors)]))
+            los_displacements1 = np.asarray([(np.dot(displacement[:3], ground_satellite_vector) /
+                                              np.linalg.norm(ground_satellite_vector))
+                                             for displacement, ground_satellite_vector
+                                             in zip(displacements_1, ground_satellite_vectors)])
 
-            # phases = 4 * np.pi * (1 / self.instrument.wavelength) * (
-            #         (los_displacements2 - los_displacements1) -
-            #         ((baseline * geodetic_heights) /
-            #          (distances * np.sin(angles))))
+            los_displacements2 = np.asanyarray([(np.dot(displacement[:3], ground_satellite_vector) /
+                                                 np.linalg.norm(ground_satellite_vector))
+                                                for displacement, ground_satellite_vector
+                                                in zip(displacements_2, ground_satellite_vectors)])
 
-            # for k in range(len(phases)):
-            #     phases[k] = np.fmod(phases[k], 2 * np.pi)
-            #     if phases[k] < 0:
-            #         phases[k] = phases[k] + (2 * np.pi)
+            phases = 4 * np.pi * (1 / self.instrument.wavelength) * (
+                    (los_displacements2 - los_displacements1) -
+                    ((baseline * geodetic_heights) /
+                     (distances * np.sin(angles))))
 
-            phases = [np.linalg.norm(self.enu_to_cartesian_vector(east=displacement_1[0], north=displacement_1[1],
-                                                                  up=displacement_1[2], latitude=displacement_1[3],
-                                                                  longitude=displacement_1[4]))
-                      for displacement_1, displacement_2 in zip(displacements_1, displacements_2)]
+            for k in range(len(phases)):
+                phases[k] = np.fmod(phases[k], 2 * np.pi)
+                if phases[k] < 0:
+                    phases[k] = phases[k] + (2 * np.pi)
 
             total_phases.append(phases)
             latitudes.append([displacement[3] for displacement in displacements_1])
@@ -374,15 +356,15 @@ class SimpleInterferogram(pet.component):
 
         cm = plt.cm.get_cmap('hsv')
 
-        # for i in range(len(self.igram)):
-        #     # Plot points on the map
-        #     im = ax.scatter(self.longitudes[i], self.latitudes[i], vmin=0, vmax=2 * np.pi, cmap=cm,
-        #                     transform=ccrs.PlateCarree(globe=globe), c=self.igram[i], marker='o', s=0.1)
-
         for i in range(len(self.igram)):
             # Plot points on the map
-            im = ax.scatter(self.longitudes[i], self.latitudes[i],
+            im = ax.scatter(self.longitudes[i], self.latitudes[i], vmin=0, vmax=2 * np.pi, cmap=cm,
                             transform=ccrs.PlateCarree(globe=globe), c=self.igram[i], marker='o', s=0.1)
+
+        # for i in range(len(self.igram)):
+        #     # Plot points on the map
+        #     im = ax.scatter(self.longitudes[i], self.latitudes[i],
+        #                     transform=ccrs.PlateCarree(globe=globe), c=self.igram[i], marker='o', s=0.1)
 
         # Add colorbar
         plt.colorbar(im, label="Phase")
