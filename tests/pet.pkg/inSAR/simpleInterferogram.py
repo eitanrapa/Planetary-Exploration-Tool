@@ -21,16 +21,16 @@ planet = pet.planets.enceladus(name="enceladus")
 instrument = pet.instruments.nightingale(name="nightingale", body_id=-303, start_look_angle=20, end_look_angle=30,
                                          start_time="2046 DEC 20 15:10:40.134", wavelength=0.13, planet=planet)
 
-# # Make a displacement ma
+# # Make a displacement map
 # displacements = pet.insar.displacementMap(name="het",
 #                                           displacement_data_path=
 #                                           "/home/eitanrapa/Documents/projects/other/Simulation_Het_Results.hdf5",
 #                                           planet=planet)
 
 # Make a displacement map
-displacements = pet.insar.displacementMap(name="base",
+displacements = pet.insar.displacementMap(name="het",
                                           displacement_data_path=
-                                          "/home/eitanrapa/Documents/projects/other/Simulation_Base_Results.hdf5",
+                                          "/home/eitanrapa/Documents/projects/other/Simulation_Het_Results.hdf5",
                                           planet=planet)
 
 # # Make an interferogram
@@ -44,19 +44,20 @@ displacements = pet.insar.displacementMap(name="base",
 # Load interferogram
 interferogram = pet.insar.simpleInterferogram(name="igram", instrument=instrument, planet=planet,
                                               displacements=displacements,
-                                              load_path="/home/eitanrapa/Documents/projects/pet/files")
+                                              load_path="/home/eitanrapa/Documents/GitHub/"
+                                                        "Planetary-Exploration-Tool/files")
 
 interferogram.recalculate_igram(baseline=0)
 
 # # Make a projection
 # projection = pet.projections.biaxialCylindrical(name="biaxial cylindrical",
-#                                                 folder_path="/home/eitanrapa/Documents/projects/pet/figs")
-# # Plot interferogram
-# interferogram.visualize(projection=projection)
+#                                                 folder_path="/home/eitanrapa/Documents/GitHub/"
+#                                                             "Planetary-Exploration-Tool/figs")
 
 # Define a projection
 projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
-                                           folder_path="/home/eitanrapa/Documents/projects/pet/figs")
+                                           folder_path="/home/eitanrapa/Documents/"
+                                                       "GitHub/Planetary-Exploration-Tool/figs")
 
 # Plot interferogram
 interferogram.visualize(projection=projection)

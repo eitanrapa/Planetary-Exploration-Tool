@@ -43,7 +43,7 @@ class DisplacementMap(pet.component):
         up_cube = displacement_file["displacement_values/up_cube"][:]
 
         # Get the latitudes, longitudes corresponding to the cubes
-        latitudes = displacement_file["latitudes"][:]
+        colatitudes = displacement_file["colatitudes"][:]
         longitudes = displacement_file["longitudes"][:]
 
         # Get the cycle time and the fractional times
@@ -54,7 +54,25 @@ class DisplacementMap(pet.component):
         displacement_file.close()
 
         # Return the retrieved values
-        return latitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube
+        return colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube
+
+    def enu_to_cartesian_vector(self, east, north, up, latitude, longitude):
+        """
+
+        """
+        longitude = np.deg2rad(longitude)
+        latitude = np.deg2rad(latitude)
+
+        # Reshape longitudes and latitudes for broadcasting
+        longitude = longitude[:, np.newaxis, np.newaxis]
+        latitude = latitude[np.newaxis, :, np.newaxis]
+
+        t = np.cos(latitude) * up - np.sin(latitude) * north
+        w = np.sin(latitude) * up + np.cos(latitude) * north
+        u = np.cos(longitude) * t - np.sin(longitude) * east
+        v = np.sin(longitude) * t + np.cos(longitude) * east
+
+        return [u, v, w]
 
     def attach(self, swath1, swath2, time_displacement=0, use_mid_point=False):
         """
@@ -73,17 +91,21 @@ class DisplacementMap(pet.component):
         time_space2 = swath2.time_space
 
         # Read the necessary data
-        latitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
+        colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
+
+        latitudes = 90 - colatitudes
+
+        u_cube, v_cube, w_cube = self.enu_to_cartesian_vector(east=east_cube, north=north_cube,
+                                                              up=up_cube,
+                                                              latitude=latitudes, longitude=longitudes)
+
+        # Stack the u, v, w arrays along a new axis to create a 4D array
+        total_cube = np.stack((u_cube, v_cube, w_cube), axis=-1)
 
         # Create interpolating functions for each dimension
-        east_interp = RegularGridInterpolator(points=(longitudes, latitudes, times),
-                                              values=east_cube, method='slinear', bounds_error=False,
-                                              fill_value=None)
-        north_interp = RegularGridInterpolator(points=(longitudes, latitudes, times),
-                                               values=north_cube, method='slinear', bounds_error=False,
-                                               fill_value=None)
-        up_interp = RegularGridInterpolator(points=(longitudes, latitudes, times),
-                                            values=up_cube, method='slinear', bounds_error=False, fill_value=None)
+        vector_interp = RegularGridInterpolator(points=(longitudes, latitudes, times),
+                                                values=total_cube, method='linear', bounds_error=False,
+                                                fill_value=None)
 
         # Get planet axes
         a, b, c = self.planet.get_axes()
@@ -93,57 +115,63 @@ class DisplacementMap(pet.component):
 
         # Populate the GroundTarget displacement values at each time
         for i in range(len(swath1.swath_beams)):
-            for point in swath1.swath_beams[i]:
 
-                # Pack the coordinates
-                cartesian_coordinates = point.x, point.y, point.z
+            # Pack the coordinates
+            cartesian_coordinates = [(point.x, point.y, point.z) for point in swath1.swath_beams[i]]
 
-                # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
-                lat, long = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[0, :2]
+            # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
+            lats, longs = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[:, :2].T
 
-                # Use mid_point if True
-                if use_mid_point:
-                    mid_index = len(time_space1) // 2
+            modified_longs = longs % 360
 
-                    # Calculate the fractional time corresponding to the cycle
-                    modified_time = ((time_space1[mid_index]) % cycle_time) / cycle_time
+            # Use mid_point if True
+            if use_mid_point:
+                mid_index = len(time_space1) // 2
 
-                else:
-                    # Calculate the fractional time corresponding to the cycle
-                    modified_time = ((time_space1[i]) % cycle_time) / cycle_time
+                # Calculate the fractional time corresponding to the cycle
+                modified_time = ((time_space1[mid_index]) % cycle_time) / cycle_time
 
+            else:
+                # Calculate the fractional time corresponding to the cycle
+                modified_time = ((time_space1[i]) % cycle_time) / cycle_time
+
+            # Attach the displacement to the point
+            u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, lats, modified_time)).T
+
+            for j in range(len(swath1.swath_beams[i])):
                 # Attach the displacement to the point
-                point.displacement = [east_interp((long, lat, modified_time)).item(),
-                                      north_interp((long, lat, modified_time)).item(),
-                                      up_interp((long, lat, modified_time)).item(),
-                                      lat, long]
+                swath1.swath_beams[i][j].displacement = [u_displacements[j], v_displacements[j],
+                                                         w_displacements[j], lats[j], longs[j]]
 
         # Populate the GroundTarget displacement values at each time
         for i in range(len(swath2.swath_beams)):
-            for point in swath2.swath_beams[i]:
 
-                # Pack the coordinates
-                cartesian_coordinates = point.x, point.y, point.z
+            # Pack the coordinates
+            cartesian_coordinates = [(point.x, point.y, point.z) for point in swath2.swath_beams[i]]
 
-                # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
-                lat, long = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[0, :2]
+            # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
+            lats, longs = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[:, :2].T
 
-                # Use mid_point if True
-                if use_mid_point:
-                    mid_index = len(time_space2) // 2
+            modified_longs = longs % 360
 
-                    # Calculate the fractional time corresponding to the cycle
-                    modified_time = ((time_space2[mid_index] + time_displacement) % cycle_time) / cycle_time
+            # Use mid_point if True
+            if use_mid_point:
+                mid_index = len(time_space2) // 2
 
-                else:
-                    # Calculate the fractional time corresponding to the cycle
-                    modified_time = ((time_space2[i] + time_displacement) % cycle_time) / cycle_time
+                # Calculate the fractional time corresponding to the cycle
+                modified_time = ((time_space2[mid_index] + time_displacement) % cycle_time) / cycle_time
 
+            else:
+                # Calculate the fractional time corresponding to the cycle
+                modified_time = ((time_space2[i] + time_displacement) % cycle_time) / cycle_time
+
+            # Attach the displacement to the point
+            u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, lats, modified_time)).T
+
+            for j in range(len(swath2.swath_beams[i])):
                 # Attach the displacement to the point
-                point.displacement = [east_interp((long, lat, modified_time)).item(),
-                                      north_interp((long, lat, modified_time)).item(),
-                                      up_interp((long, lat, modified_time)).item(),
-                                      lat, long]
+                swath2.swath_beams[i][j].displacement = [u_displacements[j], v_displacements[j],
+                                                         w_displacements[j], lats[j], longs[j]]
 
     def visualize(self, time_point, projection, direction):
         """
@@ -157,7 +185,7 @@ class DisplacementMap(pet.component):
         fig, ax, globe = projection.proj(planet=self.planet)
 
         # Read the necessary data
-        latitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
+        colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
 
         modified_time = (time_point % cycle_time) / cycle_time
 
@@ -170,7 +198,6 @@ class DisplacementMap(pet.component):
             # Loop through each (i, j) point in the 2D grid
             for i in range(len(east_cube[:, 0, 0])):
                 for j in range(len(east_cube[0, :, 0])):
-
                     # Extract the time series for the (i, j) point
                     time_series = east_cube[i, j, :]
 
@@ -190,7 +217,6 @@ class DisplacementMap(pet.component):
             # Loop through each (i, j) point in the 2D grid
             for i in range(len(north_cube[:, 0, 0])):
                 for j in range(len(north_cube[0, :, 0])):
-
                     # Extract the time series for the (i, j) point
                     time_series = north_cube[i, j, :]
 
@@ -210,7 +236,6 @@ class DisplacementMap(pet.component):
             # Loop through each (i, j) point in the 2D grid
             for i in range(len(up_cube[:, 0, 0])):
                 for j in range(len(up_cube[0, :, 0])):
-
                     # Extract the time series for the (i, j) point
                     time_series = up_cube[i, j, :]
 
