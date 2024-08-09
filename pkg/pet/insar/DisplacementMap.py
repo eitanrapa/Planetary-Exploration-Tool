@@ -74,13 +74,12 @@ class DisplacementMap(pet.component):
 
         return [u, v, w]
 
-    def attach(self, swath1, swath2, time_displacement=0, use_mid_point=False):
+    def attach(self, swath1, swath2, use_mid_point=False):
         """
         Attach to each GroundTarget of a GroundSwath object the displacement at that point at the time it was
         observed using a regular grid interpolation.
         :param swath1: GroundSwath object containing GroundTarget objects
         :param swath2: second GroundSwath object containing GroundTarget objects
-        :param time_displacement: How much time to advance the model by [s]
         :param use_mid_point: Use the middle point time of the swath as the measuring point of the displacement field
         :return: Nothing returned
         """
@@ -159,11 +158,11 @@ class DisplacementMap(pet.component):
                 mid_index = len(time_space2) // 2
 
                 # Calculate the fractional time corresponding to the cycle
-                modified_time = ((time_space2[mid_index] + time_displacement) % cycle_time) / cycle_time
+                modified_time = ((time_space2[mid_index]) % cycle_time) / cycle_time
 
             else:
                 # Calculate the fractional time corresponding to the cycle
-                modified_time = ((time_space2[i] + time_displacement) % cycle_time) / cycle_time
+                modified_time = ((time_space2[i]) % cycle_time) / cycle_time
 
             # Attach the displacement to the point
             u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, lats, modified_time)).T
@@ -257,6 +256,7 @@ class DisplacementMap(pet.component):
         ax.set_title('Displacements ' + direction)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/displacements_' + direction + '.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/displacements_' + direction + '_' + modified_time +
+                    '.png', format='png', dpi=500)
 
 # end of file

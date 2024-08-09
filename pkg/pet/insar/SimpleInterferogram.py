@@ -27,7 +27,7 @@ class SimpleInterferogram(pet.component):
     pairing_one.doc = "First instance of track number"
 
     pairing_two = pet.properties.int()
-    pairing_two.default = 0
+    pairing_two.default = 1
     pairing_two.doc = "Second instance of track number"
 
     track_number = pet.properties.int()
@@ -41,9 +41,15 @@ class SimpleInterferogram(pet.component):
         self.instrument = instrument
         self.displacements = displacements
         self.igram = []
+        self.los_displacements1 = []
+        self.los_displacements2 = []
+        self.satellite_vectors = []
+        self.displacements1 = []
+        self.displacements2 = []
         self.longitudes = []
         self.latitudes = []
         self.groundSwath = None
+        self.base_time_space = None
         if load_path is not None:
             self.load(load_path)
         else:
@@ -56,7 +62,8 @@ class SimpleInterferogram(pet.component):
         """
 
         # Open HDF5 file
-        f = h5py.File(name=path + '/interferogram.hdf5', mode="w")
+        f = h5py.File(name=path + '/' + self.displacements.pyre_name + '_' + self.track_number + '_' +
+                      self.pairing_one + '_' + self.pairing_two + '_interferogram.hdf5', mode="w")
 
         # Get data shape
         igram_shape = [len(row) for row in self.igram]
@@ -69,6 +76,41 @@ class SimpleInterferogram(pet.component):
 
         # Save flat igram data
         f.create_dataset(name="flattened_igram", data=flattened_igram, chunks=True)
+
+        # Flatten igram
+        flattened_los_displacements1 = [item for row in self.los_displacements1 for item in row]
+
+        # Save flat igram data
+        f.create_dataset(name="flattened_los_displacements1", data=flattened_los_displacements1, chunks=True)
+
+        # Flatten igram
+        flattened_los_displacements2 = [item for row in self.los_displacements2 for item in row]
+
+        # Save flat igram data
+        f.create_dataset(name="flattened_los_displacements2", data=flattened_los_displacements2, chunks=True)
+
+
+
+
+        flattened_satellite_vectors = [item for row2d in self.satellite_vectors for row in row2d for item in row]
+
+        # Save flat igram data
+        f.create_dataset(name="flattened_satellite_vectors", data=flattened_satellite_vectors, chunks=True)
+
+
+
+        flattened_displacements1 = [item for row2d in self.displacements1 for row in row2d for item in row]
+
+        # Save flat igram data
+        f.create_dataset(name="flattened_displacements1", data=flattened_displacements1, chunks=True)
+
+
+        flattened_displacements2 = [item for row2d in self.displacements2 for row in row2d for item in row]
+
+        # Save flat igram data
+        f.create_dataset(name="flattened_displacements2", data=flattened_displacements2, chunks=True)
+
+
 
         # Flatten longitudes
         flattened_longitudes = [item for row in self.longitudes for item in row]
@@ -112,14 +154,36 @@ class SimpleInterferogram(pet.component):
 
         """
 
-        f = h5py.File(name=path + '/interferogram.hdf5', mode='r')
+        f = h5py.File(name=path, mode='r')
 
         data_shape = f["data_shape"]
 
         flattened_igram = f["flattened_igram"]
+        flattened_los_displacements1 = f["flattened_los_displacements1"]
+        flattened_los_displacements2 = f["flattened_los_displacements1"]
+        flattened_satellite_vectors = f["flattened_satellite_vectors"]
+        flattened_displacements1 = f["flattened_displacements1"]
+        flattened_displacements2 = f["flattened_displacements2"]
+        flattened_longitudes = f["flattened_longitudes"]
+        flattened_latitudes = f["flattened_latitudes"]
+
         index = 0
+        index_3d = 0
         for length in data_shape:
             self.igram.append(flattened_igram[index:index + length])
+            self.los_displacements1.append(flattened_los_displacements1[index:index + length])
+            self.los_displacements2.append(flattened_los_displacements2[index:index + length])
+            self.satellite_vectors.append(np.asanyarray((flattened_satellite_vectors[index:index + length],
+                                                    flattened_satellite_vectors[index:index + length],
+                                                    flattened_satellite_vectors[index:index + length])).T)
+            self.displacements_1.append(np.asanyarray((flattened_satellite_vectors[index:index + length],
+                                                  flattened_y_displacements1[index:index + length],
+                                                  flattened_y_displacements1[index:index + length])).T)
+            self.displacements_2.append(np.asanyarray((flattened_x_displacements2[index:index + length],
+                                                  flattened_y_displacements2[index:index + length],
+                                                  flattened_z_displacements2[index:index + length])).T)
+            self.longitudes.append(flattened_longitudes[index:index + length])
+            self.latitudes.append(flattened_latitudes[index:index + length])
             index += length
 
         flattened_longitudes = f["flattened_longitudes"]
@@ -207,20 +271,6 @@ class SimpleInterferogram(pet.component):
 
         return flat_angles
 
-    def enu_to_cartesian_vector(self, east, north, up, latitude, longitude):
-        """
-
-        """
-        longitude = np.deg2rad(longitude)
-        latitude = np.deg2rad(latitude)
-
-        t = np.cos(latitude) * up - np.sin(latitude) * north
-        w = np.sin(latitude) * up + np.cos(latitude) * north
-        u = np.cos(longitude) * t - np.sin(longitude) * east
-        v = np.sin(longitude) * t + np.cos(longitude) * east
-
-        return [u, v, w]
-
     def calculate_flattened_phases(self, ground_swath1, ground_swath2, baseline):
         """
 
@@ -293,6 +343,10 @@ class SimpleInterferogram(pet.component):
                                        ground_resolution=ground_resolution, planet=self.planet,
                                        instrument=self.instrument)
 
+        self.base_time_space = self.groundSwath.time_space
+
+        self.groundSwath.time_space = self.base_time_space + orbit_cycle_time * self.pairing_one
+
         gs2 = GroundSwath(start_time=self.groundSwath.start_time,
                           end_time=self.groundSwath.end_time, time_interval=self.groundSwath.time_interval,
                           ground_resolution=self.groundSwath.ground_resolution, planet=self.planet,
@@ -301,20 +355,26 @@ class SimpleInterferogram(pet.component):
 
         gs2.swath_beams = copy.deepcopy(self.groundSwath.swath_beams)
 
-        gs2.time_space = self.groundSwath.time_space
+        gs2.time_space = self.base_time_space + orbit_cycle_time * self.pairing_two
 
-        self.displacements.attach(swath1=self.groundSwath, swath2=gs2, use_mid_point=True,
-                                  time_displacement=orbit_cycle_time)
+        self.displacements.attach(swath1=self.groundSwath, swath2=gs2, use_mid_point=True)
 
         self.calculate_flattened_phases(ground_swath1=self.groundSwath, ground_swath2=gs2, baseline=baseline)
 
-    def recalculate_igram(self, baseline):
+    def recalculate_igram(self, baseline, pairing_one=None, pairing_two=None):
         """
 
         """
 
         orbit_cycle_time = self.instrument.orbit_cycle
 
+        if pairing_one is not None:
+            self.pairing_one = pairing_one
+        if pairing_two is not None:
+            self.pairing_two = pairing_two
+
+        self.groundSwath.time_space = self.base_time_space + orbit_cycle_time * self.pairing_one
+
         gs2 = GroundSwath(start_time=self.groundSwath.start_time,
                           end_time=self.groundSwath.end_time, time_interval=self.groundSwath.time_interval,
                           ground_resolution=self.groundSwath.ground_resolution, planet=self.planet,
@@ -323,10 +383,12 @@ class SimpleInterferogram(pet.component):
 
         gs2.swath_beams = copy.deepcopy(self.groundSwath.swath_beams)
 
-        gs2.time_space = self.groundSwath.time_space
+        gs2.time_space = self.base_time_space + orbit_cycle_time * self.pairing_two
 
-        self.displacements.attach(swath1=self.groundSwath, swath2=gs2, use_mid_point=True,
-                                  time_displacement=orbit_cycle_time)
+        # Remove
+        self.groundSwath.time_space = self.groundSwath.time_space + orbit_cycle_time * self.pairing_one
+
+        self.displacements.attach(swath1=self.groundSwath, swath2=gs2, use_mid_point=True)
 
         self.calculate_flattened_phases(ground_swath1=self.groundSwath, ground_swath2=gs2, baseline=baseline)
 
@@ -361,11 +423,6 @@ class SimpleInterferogram(pet.component):
             im = ax.scatter(self.longitudes[i], self.latitudes[i], vmin=0, vmax=2 * np.pi, cmap=cm,
                             transform=ccrs.PlateCarree(globe=globe), c=self.igram[i], marker='o', s=0.1)
 
-        # for i in range(len(self.igram)):
-        #     # Plot points on the map
-        #     im = ax.scatter(self.longitudes[i], self.latitudes[i],
-        #                     transform=ccrs.PlateCarree(globe=globe), c=self.igram[i], marker='o', s=0.1)
-
         # Add colorbar
         plt.colorbar(im, label="Phase")
 
@@ -373,6 +430,7 @@ class SimpleInterferogram(pet.component):
         ax.set_title('Interferogram')
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/interferogram.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/' + self.displacements.pyre_name + '_' + self.track_number + '_' +
+                    self.pairing_one + '_' + self.pairing_two + '_interferogram.png', format='png', dpi=500)
 
 # end of file

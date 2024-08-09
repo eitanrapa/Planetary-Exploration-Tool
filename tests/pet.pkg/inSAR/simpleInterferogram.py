@@ -28,7 +28,7 @@ instrument = pet.instruments.nightingale(name="nightingale", body_id=-303, start
 #                                           planet=planet)
 
 # Make a displacement map
-displacements = pet.insar.displacementMap(name="het",
+displacements = pet.insar.displacementMap(name="Het",
                                           displacement_data_path=
                                           "/home/eitanrapa/Documents/projects/other/Simulation_Het_Results.hdf5",
                                           planet=planet)
@@ -44,10 +44,16 @@ displacements = pet.insar.displacementMap(name="het",
 # Load interferogram
 interferogram = pet.insar.simpleInterferogram(name="igram", instrument=instrument, planet=planet,
                                               displacements=displacements,
-                                              load_path="/home/eitanrapa/Documents/GitHub/"
-                                                        "Planetary-Exploration-Tool/files")
+                                              load_name="/home/eitanrapa/Documents/GitHub/"
+                                                        "Planetary-Exploration-Tool/files/interferogram.hdf5")
+
+interferogram.pairing_one = 0
+interferogram.pairing_two = 1
 
 interferogram.recalculate_igram(baseline=0)
+
+# # Save interferogram
+# interferogram.save(path="/home/eitanrapa/Documents/GitHub/Planetary-Exploration-Tool/files", name="het_45")
 
 # # Make a projection
 # projection = pet.projections.biaxialCylindrical(name="biaxial cylindrical",
