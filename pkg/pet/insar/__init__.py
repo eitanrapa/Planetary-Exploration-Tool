@@ -9,5 +9,6 @@ from .GroundTarget import GroundTarget as groundTarget
 from .DisplacementMap import DisplacementMap as displacementMap
 from .GroundSwath import GroundSwath as groundSwath
 from .SimpleInterferogram import SimpleInterferogram as simpleInterferogram
+from .LOSdisp_gram import LOSInterferogram as losgram
 
 # end of file
