@@ -36,7 +36,7 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         super().__init__(name, locator, implicit)
         self.planet = planet
         times = self.convert_times(self.get_five_tracks(latitude_cutoff=0))
-        self.orbit_cycle = times[6] - times[1]
+        self.orbit_cycle = times[5] - times[0]
 
     def _convert_times(self, times):
         """
@@ -161,7 +161,7 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
                 times.append(self.convert_utcs(ets[i])[0])
 
         # Return the times
-        return times
+        return times[1:7]
 
     @pet.export
     def plot_orbit(self, projection, start_time, end_time, time_interval=10, return_fig=False):

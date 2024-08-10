@@ -8,7 +8,7 @@
 import pet
 
 # Create a file manager
-fm = pet.spicetoolkit.fileManager(folder_path="/home/eitanrapa/Documents/projects/other")
+fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/other")
 
 # Furnish some files
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
@@ -28,45 +28,51 @@ instrument = pet.instruments.nightingale(name="nightingale", body_id=-303, start
 #                                           planet=planet)
 
 # Make a displacement map
-displacements = pet.insar.displacementMap(name="Het",
+displacements = pet.insar.displacementMap(name="het",
                                           displacement_data_path=
-                                          "/home/eitanrapa/Documents/projects/other/Simulation_Het_Results.hdf5",
+                                          "/home/user/Documents/other/Simulation_Het_Results.hdf5",
                                           planet=planet)
 
 # # Make an interferogram
-# interferogram = pet.insar.simpleInterferogram(name="igram", pairing_one=0, pairing_two=1, track_number=2,
+# interferogram = pet.insar.simpleInterferogram(name="igram", pairing_one=0, pairing_two=1, track_number=0,
 #                                               instrument=instrument, planet=planet, displacements=displacements,
 #                                               time_interval=10, ground_resolution=200, baseline=0)
 #
 # # Save interferogram
-# interferogram.save(path="/home/eitanrapa/Documents/projects/pet/files")
+# interferogram.save(path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files")
 
 # Load interferogram
 interferogram = pet.insar.simpleInterferogram(name="igram", instrument=instrument, planet=planet,
                                               displacements=displacements,
-                                              load_name="/home/eitanrapa/Documents/GitHub/"
-                                                        "Planetary-Exploration-Tool/files/interferogram.hdf5")
+                                              load_path="/home/user/Documents/GitHub/"
+                                                        "Planetary-Exploration-Tool/files/"
+                                                        "base_0_0_1_interferogram.hdf5")
 
-interferogram.pairing_one = 0
-interferogram.pairing_two = 1
+interferogram.recalculate_igram(baseline=0, pairing_one=4, pairing_two=5)
 
-interferogram.recalculate_igram(baseline=0)
+# Save interferogram
+interferogram.save(path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files")
 
-# # Save interferogram
-# interferogram.save(path="/home/eitanrapa/Documents/GitHub/Planetary-Exploration-Tool/files", name="het_45")
+# Define a projection
+projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
+                                           folder_path="/home/user/Documents/"
+                                                       "GitHub/Planetary-Exploration-Tool/figs")
+
+# Plot interferogram
+interferogram.visualize(projection=projection)
 
 # # Make a projection
 # projection = pet.projections.biaxialCylindrical(name="biaxial cylindrical",
 #                                                 folder_path="/home/eitanrapa/Documents/GitHub/"
 #                                                             "Planetary-Exploration-Tool/figs")
 
-# Define a projection
-projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
-                                           folder_path="/home/eitanrapa/Documents/"
-                                                       "GitHub/Planetary-Exploration-Tool/figs")
-
-# Plot interferogram
-interferogram.visualize(projection=projection)
+# # Define a projection
+# projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
+#                                            folder_path="/home/user/Documents/"
+#                                                        "GitHub/Planetary-Exploration-Tool/figs")
+#
+# # Plot interferogram
+# interferogram.visualize(projection=projection)
 
 fm.clear()
 
