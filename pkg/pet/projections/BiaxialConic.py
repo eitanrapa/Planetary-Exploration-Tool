@@ -33,13 +33,13 @@ class BiaxialConic(pet.component, family="pet.projections.biaxialconic", impleme
     false_northing.default = 0
     false_northing.doc = "False northing (y_0)"
 
-    first_standard_paralell = pet.properties.float()
-    first_standard_paralell.default = 33
-    first_standard_paralell.doc = "First standard parallel latitudes"
+    first_standard_parallel = pet.properties.float()
+    first_standard_parallel.default = 33
+    first_standard_parallel.doc = "First standard parallel latitudes"
 
-    second_standard_paralell = pet.properties.float()
-    second_standard_paralell.default = 45
-    second_standard_paralell.doc = "Second standard parallel latitudes"
+    second_standard_parallel = pet.properties.float()
+    second_standard_parallel.default = 45
+    second_standard_parallel.doc = "Second standard parallel latitudes"
 
     cutoff = pet.properties.float()
     cutoff.default = -30
@@ -84,8 +84,8 @@ class BiaxialConic(pet.component, family="pet.projections.biaxialconic", impleme
                                                 central_longitude=self.central_longitude,
                                                 false_easting=self.false_easting,
                                                 false_northing=self.false_northing,
-                                                standard_parallels=[self.first_standard_paralell,
-                                                                    self.second_standard_paralell],
+                                                standard_parallels=[self.first_standard_parallel,
+                                                                    self.second_standard_parallel],
                                                 cutoff=self.cutoff,
                                                 globe=img_globe)})
 

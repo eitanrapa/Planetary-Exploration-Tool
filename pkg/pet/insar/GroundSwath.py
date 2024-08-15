@@ -36,6 +36,7 @@ class GroundSwath:
         """
         Takes an instrument and planet, and uses the defined swath object parameters to calculate the detected ground
         swath.
+        :return: Nothing returned
         """
 
         # Create list of times to observe at
@@ -193,7 +194,7 @@ class GroundSwath:
     def get_angles_cartesian(self, times, satellite_positions):
         """
         Get the look angles between the GroundTargets and the satellite in degrees.
-        :param times: times of observation
+        :param times: Times of observation
         :param satellite_positions: Array of x, y, z, positions of the satellite
         :return: Absolute look angle between the surface points and the corresponding satellite position in degrees
         """
@@ -237,6 +238,7 @@ class GroundSwath:
         """
         Visualize the ground swath
         :param projection: Cartopy projection
+        :return: Nothing returned
         """
 
         # Create empty list of positions
