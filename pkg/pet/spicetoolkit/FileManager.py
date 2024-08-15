@@ -21,6 +21,7 @@ class FileManager:
         """
         Activate a set of spice kernel files
         :param names_list: List of paths for kernels
+        :return: Nothing returned
         """
 
         # Loop over paths
@@ -58,6 +59,7 @@ class FileManager:
     def clear(self):
         """
         Clear the SPICE kernels
+        :return: Nothing returned
         """
 
         # Clear the kernels

@@ -48,10 +48,15 @@ interferogram = pet.insar.simpleInterferogram(name="igram", instrument=instrumen
                                                         "Planetary-Exploration-Tool/files/"
                                                         "base_0_0_1_interferogram.hdf5")
 
-interferogram.recalculate_igram(baseline=0, pairing_one=4, pairing_two=5)
+interferogram.recalculate_igram(baseline=10)
 
-# Save interferogram
-interferogram.save(path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files")
+# # Save interferogram
+# interferogram.save(path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files")
+
+# # Make a projection
+# projection = pet.projections.biaxialCylindrical(name="biaxial cylindrical",
+#                                                 folder_path="/home/eitanrapa/Documents/GitHub/"
+#                                                             "Planetary-Exploration-Tool/figs")
 
 # Define a projection
 projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
@@ -60,19 +65,6 @@ projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitu
 
 # Plot interferogram
 interferogram.visualize(projection=projection)
-
-# # Make a projection
-# projection = pet.projections.biaxialCylindrical(name="biaxial cylindrical",
-#                                                 folder_path="/home/eitanrapa/Documents/GitHub/"
-#                                                             "Planetary-Exploration-Tool/figs")
-
-# # Define a projection
-# projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
-#                                            folder_path="/home/user/Documents/"
-#                                                        "GitHub/Planetary-Exploration-Tool/figs")
-#
-# # Plot interferogram
-# interferogram.visualize(projection=projection)
 
 fm.clear()
 

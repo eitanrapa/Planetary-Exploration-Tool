@@ -58,8 +58,17 @@ class DisplacementMap(pet.component):
 
     def enu_to_cartesian_vector(self, east, north, up, latitude, longitude):
         """
-
+        Function that converts between local east, north, up vectors and ellipsoidal center x, y, z vectors.
+        Also needs local coordinates.
+        :param east: local east vector
+        :param north: local north vector
+        :param up: local up vector
+        :param latitude: local latitude of point
+        :param longitude: local longitude of point
+        :return: u, v, w vector
         """
+
+        # Convert longitude and latitude to radians
         longitude = np.deg2rad(longitude)
         latitude = np.deg2rad(latitude)
 
@@ -67,11 +76,13 @@ class DisplacementMap(pet.component):
         longitude = longitude[:, np.newaxis, np.newaxis]
         latitude = latitude[np.newaxis, :, np.newaxis]
 
+        # Calculate vector transformation
         t = np.cos(latitude) * up - np.sin(latitude) * north
         w = np.sin(latitude) * up + np.cos(latitude) * north
         u = np.cos(longitude) * t - np.sin(longitude) * east
         v = np.sin(longitude) * t + np.cos(longitude) * east
 
+        # Return the vector
         return [u, v, w]
 
     def attach(self, swath1, swath2, use_mid_point=False):
@@ -92,8 +103,10 @@ class DisplacementMap(pet.component):
         # Read the necessary data
         colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
 
+        # Convert colatitudes to latitudes
         latitudes = 90 - colatitudes
 
+        # Convert cubes of east, north, up vectors to u, v, w (local x, y, z coordinates)
         u_cube, v_cube, w_cube = self.enu_to_cartesian_vector(east=east_cube, north=north_cube,
                                                               up=up_cube,
                                                               latitude=latitudes, longitude=longitudes)
@@ -101,7 +114,7 @@ class DisplacementMap(pet.component):
         # Stack the u, v, w arrays along a new axis to create a 4D array
         total_cube = np.stack((u_cube, v_cube, w_cube), axis=-1)
 
-        # Create interpolating functions for each dimension
+        # Create interpolating function
         vector_interp = RegularGridInterpolator(points=(longitudes, latitudes, times),
                                                 values=total_cube, method='linear', bounds_error=False,
                                                 fill_value=None)
@@ -121,6 +134,7 @@ class DisplacementMap(pet.component):
             # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
             lats, longs = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[:, :2].T
 
+            # Convert longitudes to 0 - 360 format
             modified_longs = longs % 360
 
             # Use mid_point if True
@@ -151,6 +165,7 @@ class DisplacementMap(pet.component):
             # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
             lats, longs = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[:, :2].T
 
+            # Convert longitudes to 0 - 360 format
             modified_longs = longs % 360
 
             # Use mid_point if True

@@ -14,13 +14,13 @@ class Conversions(pet.component):
     """
 
     a = pet.properties.float()
-    a.doc = "first semiaxis [m]"
+    a.doc = "first semi-axis [m]"
 
     b = pet.properties.float()
-    b.doc = "second semiaxis [m]"
+    b.doc = "second semi-axis [m]"
 
     c = pet.properties.float()
-    c.doc = "third semiaxis [m]"
+    c.doc = "third semi-axis [m]"
 
     def _cartesian(self, geodetic_coordinates):
         """

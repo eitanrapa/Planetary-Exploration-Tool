@@ -25,7 +25,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     def get_axes(self):
         """
         Return the axes of the planet
-        :return: a, b, c, Equatorial major and minor semiaxes and polar semiaxis [m]
+        :return: a, b, c, Equatorial major and minor semi-axes and polar semi-axis [m]
         """
 
         # Get the axes using the SPICE toolkit
@@ -88,7 +88,6 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     def visualize_topography(self, projection, return_fig=False):
         """
         Creates a visualization of the surface of Enceladus using the planet DSK
-        :param visualization: Visualization tool to use
         :param projection: Cartopy projection
         :param return_fig: Whether to return the fig, ax, globe objects
         """
@@ -128,7 +127,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         # Interpolation grid
         grid = griddata((longitudes, latitudes), heights, (grid_x, grid_y), method='cubic', fill_value=0)
 
-        # Make a light-source for topographic hillshading
+        # Make a light-source for topographic hill-shading
         cmap = plt.get_cmap('terrain')
         ls = LightSource(azdeg=315, altdeg=45)
 
