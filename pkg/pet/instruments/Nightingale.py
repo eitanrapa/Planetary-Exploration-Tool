@@ -32,8 +32,8 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
     wavelength = pet.properties.float()
     wavelength.doc = "Radar wavelength"
 
-    def __init__(self, name, locator, implicit, planet):
-        super().__init__(name, locator, implicit)
+    def __init__(self, planet, **kwargs):
+        super().__init__(**kwargs)
         self.planet = planet
         times = self.convert_times(self.get_five_tracks(latitude_cutoff=0))
         self.orbit_cycle = times[5] - times[0]
@@ -164,19 +164,20 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         return times[1:7]
 
     @pet.export
-    def plot_orbit(self, projection, start_time, end_time, time_interval=10, return_fig=False):
+    def plot_orbit(self, projection, start_time, end_time, temporal_resolution=10, fig=None, globe=None, ax=None,
+                   return_fig=False):
         """
         Plot the orbit of the instrument
         :param projection: Cartopy projection to use
         :param start_time: Start time of orbit plotting
         :param end_time: End time of orbit plotting
-        :param time_interval: Time interval for plot points
+        :param temporal_resolution: Time interval for plot points
         :param return_fig: Whether to return the fig, ax, globe objects
         """
 
         # Create list of times to observe at
-        times = np.arange(self.convert_times(times=start_time), self.convert_times(times=end_time) + time_interval,
-                          time_interval)
+        times = np.arange(self.convert_times(times=start_time),
+                          self.convert_times(times=end_time) + temporal_resolution, temporal_resolution)
 
         # Get the positions and velocities
         positions, velocities = self.get_states(times)
@@ -190,8 +191,10 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         # Get geodetic coordinates
         geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)[:, :3]
 
-        # Get fig, ax, globe from topography
-        fig, ax, globe = self.planet.visualize_topography(projection=projection, return_fig=True)
+        if fig is None:
+
+            # Get the projection
+            fig, ax, globe = projection.proj(planet=self.planet)
 
         # Get the coordinates
         coordinates = [(long, lat, height) for lat, long, height in geodetic_coordinates]
@@ -206,7 +209,7 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
             return fig, ax, globe
 
         # Add labels and legend
-        ax.set_title('Orbit')
+        ax.set_title('Orbit', pad=20)
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/orbit.png', format='png', dpi=500)

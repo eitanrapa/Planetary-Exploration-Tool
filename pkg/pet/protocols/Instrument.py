@@ -32,7 +32,7 @@ class Instrument(pet.protocol, family="pet.instruments"):
         """
 
     @pet.provides
-    def plot_orbit(self, visualization, planet, start_time, end_time, time_interval, return_fig):
+    def plot_orbit(self, visualization, planet, start_time, end_time, temporal_resolution, return_fig):
         """
         Plot the orbit of the instrument
         """

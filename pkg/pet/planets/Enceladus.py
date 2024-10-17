@@ -85,7 +85,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         return sub_points, distances
 
     @pet.export
-    def visualize_topography(self, projection, return_fig=False):
+    def visualize_topography(self, projection, fig=None, globe=None, ax=None, return_fig=False):
         """
         Creates a visualization of the surface of Enceladus using the planet DSK
         :param projection: Cartopy projection
@@ -110,8 +110,10 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         # Convert coordinate vertices
         geodetic_coordinates = convert.geodetic(cartesian_coordinates=np.asarray([x, y, z]).T)[:, :3]
 
-        # Get the projection
-        fig, ax, globe = projection.proj(planet=self)
+        if fig is None:
+
+            # Get the projection
+            fig, ax, globe = projection.proj(planet=self)
 
         # Get reduced set of coordinates
         trimmed_coordinates = [(long, lat, height) for lat, long, height in
@@ -150,7 +152,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         plt.colorbar(im, label="Heights [m]")
 
         # Add labels and legend
-        ax.set_title('Topography')
+        ax.set_title('Topography', pad=20)
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/topography.png', format='png', dpi=500)
