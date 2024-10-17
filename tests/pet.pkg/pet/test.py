@@ -19,7 +19,7 @@ instrument = pet.instruments.nightingale(name="nightingale", body_id=-303, start
 planet = pet.planets.enceladus(name="enceladus")
 
 gs = pet.insar.groundSwath(name="1", start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 20 15:10:50.134",
-                           time_interval=10, ground_resolution=2000, planet=planet, instrument=instrument)
+                           temporal_resolution=10, spatial_resolution=2000, planet=planet, instrument=instrument)
 
 times = instrument.get_five_tracks(planet)
 

@@ -14,7 +14,7 @@ from scipy.interpolate import interp1d
 import numpy as np
 
 
-class DisplacementMap(pet.component):
+class DeformationMap(pet.component):
     """
     Class that represents an instance of displacement values created by a Finite Element Model.
     """
@@ -22,8 +22,8 @@ class DisplacementMap(pet.component):
     displacement_data_path = pet.properties.str()
     displacement_data_path.doc = "path to hdf5 file containing surface displacement"
 
-    def __init__(self, name, locator, implicit, planet):
-        super().__init__(name, locator, implicit)
+    def __init__(self, planet, **kwargs):
+        super().__init__(**kwargs)
         self.planet = planet
 
     def read_displacements(self):
@@ -85,20 +85,10 @@ class DisplacementMap(pet.component):
         # Return the vector
         return [u, v, w]
 
-    def attach(self, swath1, swath2, use_mid_point=False):
-        """
-        Attach to each GroundTarget of a GroundSwath object the displacement at that point at the time it was
-        observed using a regular grid interpolation.
-        :param swath1: GroundSwath object containing GroundTarget objects
-        :param swath2: second GroundSwath object containing GroundTarget objects
-        :param use_mid_point: Use the middle point time of the swath as the measuring point of the displacement field
-        :return: Nothing returned
+    def get_displacements(self, time_space, swath):
         """
 
-        # Get list of times to observe at
-        time_space1 = swath1.time_space
-
-        time_space2 = swath2.time_space
+        """
 
         # Read the necessary data
         colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
@@ -125,69 +115,24 @@ class DisplacementMap(pet.component):
         # Create a coordinate conversion object
         convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
 
-        # Populate the GroundTarget displacement values at each time
-        for i in range(len(swath1.swath_beams)):
+        flattened_points = [coord for sublist in swath for coord in sublist]
+        flattened_time_space = [time for time, sublist in zip(time_space, swath) for _ in sublist]
 
-            # Pack the coordinates
-            cartesian_coordinates = [(point.x, point.y, point.z) for point in swath1.swath_beams[i]]
+        # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
+        lats, longs = convert.geodetic(cartesian_coordinates=flattened_points)[:, :2].T
 
-            # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
-            lats, longs = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[:, :2].T
+        # Convert longitudes to 0 - 360 format
+        modified_longs = longs % 360
 
-            # Convert longitudes to 0 - 360 format
-            modified_longs = longs % 360
+        # Calculate the fractional time corresponding to the cycle
+        modified_times = (np.array(flattened_time_space) % cycle_time) / cycle_time
 
-            # Use mid_point if True
-            if use_mid_point:
-                mid_index = len(time_space1) // 2
+        # Attach the displacement to the point
+        u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, lats, modified_times)).T
 
-                # Calculate the fractional time corresponding to the cycle
-                modified_time = ((time_space1[mid_index]) % cycle_time) / cycle_time
+        return u_displacements, v_displacements, w_displacements, lats, longs
 
-            else:
-                # Calculate the fractional time corresponding to the cycle
-                modified_time = ((time_space1[i]) % cycle_time) / cycle_time
-
-            # Attach the displacement to the point
-            u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, lats, modified_time)).T
-
-            for j in range(len(swath1.swath_beams[i])):
-                # Attach the displacement to the point
-                swath1.swath_beams[i][j].displacement = [u_displacements[j], v_displacements[j],
-                                                         w_displacements[j], lats[j], longs[j]]
-
-        # Populate the GroundTarget displacement values at each time
-        for i in range(len(swath2.swath_beams)):
-
-            # Pack the coordinates
-            cartesian_coordinates = [(point.x, point.y, point.z) for point in swath2.swath_beams[i]]
-
-            # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
-            lats, longs = convert.geodetic(cartesian_coordinates=cartesian_coordinates)[:, :2].T
-
-            # Convert longitudes to 0 - 360 format
-            modified_longs = longs % 360
-
-            # Use mid_point if True
-            if use_mid_point:
-                mid_index = len(time_space2) // 2
-
-                # Calculate the fractional time corresponding to the cycle
-                modified_time = ((time_space2[mid_index]) % cycle_time) / cycle_time
-
-            else:
-                # Calculate the fractional time corresponding to the cycle
-                modified_time = ((time_space2[i]) % cycle_time) / cycle_time
-
-            # Attach the displacement to the point
-            u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, lats, modified_time)).T
-
-            for j in range(len(swath2.swath_beams[i])):
-                # Attach the displacement to the point
-                swath2.swath_beams[i][j].displacement = [u_displacements[j], v_displacements[j],
-                                                         w_displacements[j], lats[j], longs[j]]
-
-    def visualize(self, time_point, projection, direction):
+    def visualize(self, time_point, projection, direction, fig=None, globe=None, ax=None, return_fig=False):
         """
         Visualize the displacement map at a specific time
         :param time_point: Point in cycle at which to view displacements [s]
@@ -195,8 +140,10 @@ class DisplacementMap(pet.component):
         :param direction: Vector direction to view, east, north, or up
         """
 
-        # Get the projection
-        fig, ax, globe = projection.proj(planet=self.planet)
+        if fig is None:
+
+            # Get the projection
+            fig, ax, globe = projection.proj(planet=self.planet)
 
         # Read the necessary data
         colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
@@ -264,14 +211,18 @@ class DisplacementMap(pet.component):
         else:
             raise Exception("direction must be east, north, or up")
 
+        # return fig, ax, globe if necessary
+        if return_fig:
+            return fig, ax, globe
+
         # Add a colorbar
         plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25, label="[m]")
 
         # Add labels and legend
-        ax.set_title('Displacements ' + direction)
+        ax.set_title('Displacements ' + direction, pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/displacements_' + direction + '_' + modified_time +
+        plt.savefig(fname=projection.folder_path + '/displacements_' + direction + '_' + str(modified_time) +
                     '.png', format='png', dpi=500)
 
 # end of file

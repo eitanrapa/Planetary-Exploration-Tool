@@ -43,8 +43,12 @@ from . import protocols
 from . import planets
 # instruments
 from . import instruments
-# inSAR
-from . import insar
+# models
+from . import models
+# mission
+from . import mission
+# operations
+from . import operations
 # projections
 from . import projections
 # spicetoolkit
