@@ -5,6 +5,7 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from .ChirpChirp import ChirpChirp as chirpchirp
+from .DeformationMap import DeformationMap as deformationMap
+from .Surface import Surface as surface
 
 # end of file

@@ -14,7 +14,16 @@ fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Plane
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
                       "insar_6stride_26d_v7_seo.bsp", "latest_leapseconds.tls"])
 
-# Clear the files
+# Make a planet
+planet = pet.planets.enceladus(name="enceladus")
+
+# Make an instrument
+instrument = pet.instruments.chirpchirp(
+    instrument_parameters_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input/Parameters Sband.xlsx")
+
+# Print the bandwidth
+print(instrument.bw)
+
 fm.clear()
 
 # end of file

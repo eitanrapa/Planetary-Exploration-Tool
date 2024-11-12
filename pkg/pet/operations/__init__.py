@@ -6,5 +6,6 @@
 # (c) 2023-2024 all rights reserved
 
 from .Interferogram import Interferogram as interferogram
+from .TimeSeries import TimeSeries as timeSeries
 
 # end of file

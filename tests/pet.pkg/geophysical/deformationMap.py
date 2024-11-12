@@ -8,20 +8,20 @@
 import pet
 
 # Create a file manager
-fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/other")
+fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input")
 
 # Furnish some files
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
                       "insar_6stride_26d_v7_seo.bsp", "latest_leapseconds.tls"])
-
 # Make a planet
 planet = pet.planets.enceladus(name="enceladus")
 
 # Make a displacement map
-deformation_map = pet.models.deformationMap(name="het",
-                                            displacement_data_path=
-                                            "/home/user/Documents/other/Simulation_Het_Results.hdf5",
-                                            planet=planet)
+deformation_map = pet.geophysical.deformationMap(name="het",
+                                                 displacement_data_path=
+                                                 "/home/user/Documents/GitHub/Planetary-Exploration-Tool/"
+                                                 "input/Simulation_Het_Results.hdf5",
+                                                 planet=planet)
 
 # Define a projection
 projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,

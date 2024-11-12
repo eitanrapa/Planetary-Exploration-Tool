@@ -6,5 +6,6 @@
 # (c) 2023-2024 all rights reserved
 
 from .FileManager import FileManager as fileManager
+from .TimeConversion import TimeConversion as timeConversion
 
 # end of file

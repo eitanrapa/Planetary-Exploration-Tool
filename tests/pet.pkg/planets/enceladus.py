@@ -8,7 +8,7 @@
 import pet
 
 # Create a file manager
-fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/other")
+fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input")
 
 # Furnish some files
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",

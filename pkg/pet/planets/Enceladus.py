@@ -64,18 +64,18 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         return intersects
 
     @pet.export
-    def get_sub_obs_points(self, times, instrument):
+    def get_sub_obs_points(self, times, conops):
         """
-        Get the nadir sub-observation points of the instrument with the DSK
+        Get the nadir sub-observation points of the orbit with the DSK
         :param times: Times to calculate the sub-observation point in accordance to the satellite position [s]
-        :param instrument: The instrument
+        :param conops: Concept of operation containing orbits
         :return: The x, y, z sub-observations points and the distance between the satellite and this observation points.
         """
 
         # Use the SPICE toolkit to calculate sub-observation points and vectors
         sub_points, surface_vectors = spice.subpnt_vector(method="nadir/dsk/unprioritized",
                                                           target=self.body_id, et=times, fixref=self.reference_id,
-                                                          abcorr="None", obsrvr=str(instrument.body_id))[::2]
+                                                          abcorr="None", obsrvr=str(conops.body_id))[::2]
 
         # Convert to meters
         sub_points = np.asanyarray(sub_points) * 1e3
@@ -89,7 +89,10 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         """
         Creates a visualization of the surface of Enceladus using the planet DSK
         :param projection: Cartopy projection
-        :param return_fig: Whether to return the fig, ax, globe objects
+        :param fig: matplotlib figure
+        :param globe: cartopy globe
+        :param ax: matplotlib ax
+        :param return_fig: Whether to return fig, globe, ax
         """
 
         # Load the topography from DSK

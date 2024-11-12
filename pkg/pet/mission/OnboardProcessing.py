@@ -10,20 +10,15 @@ import numpy as np
 from itertools import combinations
 
 
-class AcquisitionCadence(pet.component):
+class OnboardProcessing(pet.component):
     """
 
     """
 
-    def __init__(self, planet, instrument, deformation_map, stored_acquisition_number, acquisition_radius,
-                 acquisitions, **kwargs):
+    def __init__(self, planet, conops, **kwargs):
         super().__init__(**kwargs)
         self.planet = planet
-        self.instrument = instrument
-        self.deformation_map = deformation_map
-        self.stored_acquisition_number = stored_acquisition_number
-        self.acquisition_radius = acquisition_radius
-        self.acquisitions = acquisitions
+        self.conops = conops
 
     def extremal_distribution(self, n):
         """
