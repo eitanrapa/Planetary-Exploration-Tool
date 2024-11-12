@@ -14,7 +14,10 @@ fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Plane
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
                       "insar_6stride_26d_v7_seo.bsp", "latest_leapseconds.tls"])
 
-# Clear the files
-fm.clear()
+# Create a time conversion object
+time_conversion = pet.spicetoolkit.timeConversion()
+
+# Check conversions are consistent
+print(time_conversion.convert_utcs(time_conversion.convert_times("2046 DEC 20 15:10:40.134")))
 
 # end of file

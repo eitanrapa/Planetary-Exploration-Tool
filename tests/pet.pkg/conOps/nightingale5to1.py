@@ -8,7 +8,7 @@
 import pet
 
 # Create a file manager
-fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/other")
+fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input")
 
 # Furnish some files
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
@@ -17,17 +17,17 @@ fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tp
 # Make a planet
 planet = pet.planets.enceladus(name="enceladus")
 
-# Make an instrument
-instrument = pet.instruments.nightingale(name="nightingale", body_id=-303, start_look_angle=20, end_look_angle=30,
-                                         start_time="2046 DEC 20 15:10:40.134", wavelength=0.13, planet=planet)
+# Make a con ops
+conops = pet.conOps.nightingale5to1(name="nightingale",
+                                    body_id=-303, start_time="2046 DEC 20 15:10:40.134", planet=planet)
 
 # Make a projection
 projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
                                            folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
 
 # Plot the orbit
-instrument.plot_orbit(start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 22 03:10:40.134",
-                      projection=projection)
+conops.plot_orbit(start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 22 03:10:40.134",
+                  projection=projection)
 
 fm.clear()
 

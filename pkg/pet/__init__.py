@@ -41,10 +41,12 @@ from . import meta
 from . import protocols
 # planets
 from . import planets
+# concepts of operation
+from . import conOps
 # instruments
 from . import instruments
-# models
-from . import models
+# geophysical
+from . import geophysical
 # mission
 from . import mission
 # operations

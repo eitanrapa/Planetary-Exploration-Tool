@@ -9,6 +9,7 @@ import pet
 import h5py
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+import pathlib
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import interp1d
 import numpy as np
@@ -19,11 +20,9 @@ class DeformationMap(pet.component):
     Class that represents an instance of displacement values created by a Finite Element Model.
     """
 
-    displacement_data_path = pet.properties.str()
-    displacement_data_path.doc = "path to hdf5 file containing surface displacement"
-
-    def __init__(self, planet, **kwargs):
+    def __init__(self, planet, displacement_data_path, **kwargs):
         super().__init__(**kwargs)
+        self.displacement_data_path = pathlib.PosixPath(displacement_data_path)
         self.planet = planet
 
     def read_displacements(self):
@@ -85,7 +84,7 @@ class DeformationMap(pet.component):
         # Return the vector
         return [u, v, w]
 
-    def get_displacements(self, time_space, swath):
+    def get_displacements(self, track):
         """
 
         """
@@ -109,28 +108,21 @@ class DeformationMap(pet.component):
                                                 values=total_cube, method='linear', bounds_error=False,
                                                 fill_value=None)
 
-        # Get planet axes
-        a, b, c = self.planet.get_axes()
-
-        # Create a coordinate conversion object
-        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
-
-        flattened_points = [coord for sublist in swath for coord in sublist]
-        flattened_time_space = [time for time, sublist in zip(time_space, swath) for _ in sublist]
-
-        # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
-        lats, longs = convert.geodetic(cartesian_coordinates=flattened_points)[:, :2].T
+        # Access longitude and latitude coordinates
+        longitudes = track.data["longitude"].values
+        latitudes = track.data["latitude"].values
+        time_space = track.data["time"].values
 
         # Convert longitudes to 0 - 360 format
-        modified_longs = longs % 360
+        modified_longs = np.asanyarray(longitudes) % 360
 
         # Calculate the fractional time corresponding to the cycle
-        modified_times = (np.array(flattened_time_space) % cycle_time) / cycle_time
+        modified_times = (np.array(time_space) % cycle_time) / cycle_time
 
         # Attach the displacement to the point
-        u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, lats, modified_times)).T
+        u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, latitudes, modified_times)).T
 
-        return u_displacements, v_displacements, w_displacements, lats, longs
+        return u_displacements, v_displacements, w_displacements
 
     def visualize(self, time_point, projection, direction, fig=None, globe=None, ax=None, return_fig=False):
         """
@@ -138,6 +130,11 @@ class DeformationMap(pet.component):
         :param time_point: Point in cycle at which to view displacements [s]
         :param projection: Cartopy projection
         :param direction: Vector direction to view, east, north, or up
+        :param fig: matplotlib figure
+        :param globe: cartopy globe
+        :param ax: matplotlib ax
+        :param return_fig: Whether to return fig, globe, ax
+        :return: Nothing returned
         """
 
         if fig is None:

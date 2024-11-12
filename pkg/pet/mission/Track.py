@@ -5,31 +5,32 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-import pet
-import git
-import h5py
-import numpy as np
-import cspyce as spice
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+import cspyce as spice
+import git
+import matplotlib.pyplot as plt
+import numpy as np
+import pet
+import xarray as xr
 
 
 class Track:
     """
-    An object containing the swath of a satellite pass. Contains the start, end, and temporal_resolution of the satellite pass
+    An object containing the swath of a satellite pass. Contains the start, end, and temporal_resolution of the
+    satellite pass
     as well as given ground resolution to calculate vectors with. Also contains the satellite time vector and a
     2-D array of the azimuthal beams by row and GroundTargets populating the rows.
     """
 
-    def __init__(self, start_time, end_time, planet, instrument, temporal_resolution, spatial_resolution):
+    def __init__(self, start_time, end_time, planet, conops, instrument, temporal_resolution, spatial_resolution):
         self.start_time = start_time
         self.end_time = end_time
         self.planet = planet
+        self.conOps = conops
         self.instrument = instrument
         self.temporal_resolution = temporal_resolution
         self.spatial_resolution = spatial_resolution
-        self.time_space = []
-        self.swath = []
+        self.data = None
 
     def save(self):
         """
@@ -39,30 +40,8 @@ class Track:
 
         # Open HDF5 file
         repo = git.Repo('.', search_parent_directories=True)
-        f = h5py.File(name=repo.working_tree_dir + '/files/track.hdf5', mode="w")
-
-        # Save times
-        f.attrs["start_time"] = self.start_time
-        f.attrs["end_time"] = self.end_time
-
-        # Save resolutions
-        f.attrs["temporal_resolution"] = self.temporal_resolution
-        f.attrs["spatial_resolution"] = self.spatial_resolution
-
-        # Save time space
-        f.create_dataset(name="time_space", data=self.time_space, chunks=True)
-
-        # Get data shape
-        swath_shape = [len(row) for row in self.swath]
-
-        # Save data shape
-        f.create_dataset(name="data_shape", data=swath_shape, chunks=True)
-
-        # Flatten swath
-        flattened_swath = [item for row in self.swath for item in row]
-
-        # Save flat swath
-        f.create_dataset(name="flattened_swath", data=flattened_swath, chunks=True)
+        self.data.to_netcdf(repo.working_tree_dir + '/files/track_' + str(self.conOps.body_id) + '_'
+                            + str(self.start_time) + '_' + str(self.end_time) + ".nc")
 
     def load(self):
         """
@@ -72,39 +51,56 @@ class Track:
 
         # Open the HDF5 file in read mode
         repo = git.Repo('.', search_parent_directories=True)
-        f = h5py.File(name=repo.working_tree_dir + '/files/track.hdf5', mode='r')
+        data = xr.open_dataset(repo.working_tree_dir + '/files/track_' + str(self.conOps.body_id) + '_'
+                               + str(self.start_time) + '_' + str(self.end_time) + ".nc")
+        self.data = data
 
-        # Get the data shape
-        data_shape = f["data_shape"]
+    def create_data_array(self, cartesian_coordinates, geodetic_coordinates, look_angles, times):
+        """
 
-        # Get times
-        self.start_time = f.attrs["start_time"]
-        self.end_time = f.attrs["end_time"]
+        """
 
-        # Get resolutions
-        self.temporal_resolution = f.attrs["temporal_resolution"]
-        self.spatial_resolution = f.attrs["spatial_resolution"]
+        # Create the xarray Dataset
+        da = xr.DataArray(
+            data=look_angles,
+            dims=["points"],
+            coords={
+                "time": ("points", times),
+                "x": ("points", np.asanyarray([point[0] for point in cartesian_coordinates])),
+                "y": ("points", np.asanyarray([point[1] for point in cartesian_coordinates])),
+                "z": ("points", np.asanyarray([point[2] for point in cartesian_coordinates])),
+                "latitude": ("points", np.asanyarray([point[0] for point in geodetic_coordinates])),
+                "longitude": ("points", np.asanyarray([point[1] for point in geodetic_coordinates])),
+                "height": ("points", np.asanyarray([point[2] for point in geodetic_coordinates]))},
+            attrs=dict(
+                body_id=self.conOps.body_id,
+                start_time=self.start_time,
+                end_time=self.end_time
+            ),
+        )
 
-        self.time_space = f["time_space"]
-        flattened_swath = f["flattened_swath"]
+        self.data = da
 
-        # Use the date shape and known structure to populate the object instance variables
-        index = 0
-        for length in data_shape:
-            self.swath.append(flattened_swath[index:index + length])
-            index += length
+    def convert_positions(self, flattened_points):
+
+        # Get planet axes
+        a, b, c = self.planet.get_axes()
+
+        # Create a coordinate conversion object
+        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
+
+        # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
+        flattened_swath_coordinates = np.asanyarray(convert.geodetic(cartesian_coordinates=flattened_points)[:, :3])
+
+        return flattened_swath_coordinates
 
     def calculate_ground_swath(self):
         """
-        Takes an instrument and planet, and uses the defined swath object parameters to calculate the detected ground
-        swath.
-        :return: Nothing returned
+        Vectorized calculation of the ground swath.
         """
 
         # Get the time space
-        time_space = np.arange(self.instrument.convert_times(times=self.start_time),
-                               self.instrument.convert_times(times=self.end_time) +
-                               self.temporal_resolution, self.temporal_resolution)
+        time_space = np.arange(self.start_time, self.end_time + self.temporal_resolution, self.temporal_resolution)
 
         # Get planet axes
         a, b, c = self.planet.get_axes()
@@ -113,7 +109,7 @@ class Track:
         num_theta = int((2 * np.pi / self.spatial_resolution) * np.average((a, b, c)))
 
         # Get positions and velocities of the satellite for the observation times
-        satellite_positions, satellite_velocities = self.instrument.get_states(times=time_space[:])
+        satellite_positions, satellite_velocities = self.conOps.get_states(times=time_space[:])
 
         # Create the SPICE planes with the normal as the satellite velocities originating at planet center
         planes = spice.nvp2pl_vector(normal=satellite_velocities, point=[0, 0, 0])
@@ -138,7 +134,7 @@ class Track:
             intersects = self.planet.get_surface_intersects(vectors=vectors)
 
             # Make groundTarget objects with the intersects
-            swath_beams.append([(intersect[0], intersect[1], intersect[2]) for intersect in intersects])
+            swath_beams.append([[intersect[0], intersect[1], intersect[2]] for intersect in intersects])
 
         # Calculate the relative positions of each GroundTarget for each beam
         relative_positions = self.point_positions_relative_to_satellite(swath_beams=swath_beams,
@@ -155,24 +151,27 @@ class Track:
         # Check the beams for off-limb, look_angles, and relative positions
         for i in range(len(swath_beams)):
 
-            azimuthal_points = []
+            indices = []
             for j in range(len(swath_beams[i])):
-
-                # Get groundTarget
-                ground = swath_beams[i][j]
 
                 # Check if the look angle and relative position is correct
                 if ((self.instrument.start_look_angle < look_angles[i][j] < self.instrument.end_look_angle)
                         and (relative_positions[i][j] == "right") and limb_checks[i][j] == 0):
                     # Append the groundTarget to azimuthal beam
-                    azimuthal_points.append(ground)
+                    indices.append(j)
 
             # Replace previous beam with all accepted points
-            swath_beams[i] = azimuthal_points
+            swath_beams[i] = [swath_beams[i][index] for index in indices]
+            look_angles[i] = [look_angles[i][index] for index in indices]
 
-        self.time_space = time_space
-        self.swath = swath_beams
-        return self.time_space, self.swath
+        flat_positions = np.asanyarray([coord for sublist in swath_beams for coord in sublist])
+        flat_angles = np.asanyarray([angle for sublist in look_angles for angle in sublist])
+        times = [[time] * len(beams) for time, beams in zip(time_space, swath_beams)]
+        flat_times = np.asanyarray([time for sublist in times for time in sublist])
+        swath_coordinates = self.convert_positions(flattened_points=flat_positions)
+
+        self.create_data_array(cartesian_coordinates=flat_positions, geodetic_coordinates=swath_coordinates,
+                               look_angles=flat_angles, times=flat_times)
 
     def check_limbs(self, swath_beams, satellite_positions):
         """
@@ -226,7 +225,7 @@ class Track:
         for i in range(len(swath_beams)):
 
             # Get surface positions per beam
-            surface_positions = np.asarray([(point[0], point[1], point[2])  for point in swath_beams[i]])
+            surface_positions = np.asarray([(point[0], point[1], point[2]) for point in swath_beams[i]])
 
             # Calculate vectors from satellite to point and the satellite's direction
             vectors_to_point = surface_positions - satellite_positions[i]
@@ -264,7 +263,7 @@ class Track:
         """
 
         # Calculate the satellite intersects and heights with the shape
-        intersects, satellite_heights = self.planet.get_sub_obs_points(times=times, instrument=self.instrument)
+        intersects, satellite_heights = self.planet.get_sub_obs_points(times=times, conops=self.conOps)
 
         # Calculate the distance between center and satellite intersects
         satellite_radii = np.asarray([np.linalg.norm(intersect - [0, 0, 0]) for intersect in intersects])
@@ -301,34 +300,20 @@ class Track:
         """
         Visualize the ground swath
         :param projection: Cartopy projection
+        :param fig: matplotlib figure
+        :param globe: cartopy globe
+        :param ax: matplotlib ax
+        :param return_fig: Whether to return fig, globe, ax
         :return: Nothing returned
         """
 
-        # Create empty list of positions
-        positions = []
-
-        # Get positions from swath beams
-        for beam in self.swath:
-            for point in beam:
-                positions.append([point[0], point[1], point[2]])
-
-        # Get planet axes
-        a, b, c = self.planet.get_axes()
-
-        # Create a coordinate conversion object
-        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
-
-        # Convert positions to geodetic coordinates
-        geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)[:, :3]
-
         if fig is None:
-
             # Get the projection
             fig, ax, globe = projection.proj(planet=self.planet)
 
-        # Get the coordinates
-        coordinates = [(long, lat, height) for lat, long, height in geodetic_coordinates]
-        longitudes, latitudes, heights = zip(*coordinates)
+        # Access longitude and latitude coordinates
+        longitudes = self.data["longitude"].values
+        latitudes = self.data["latitude"].values
 
         # Plot points on the map
         ax.scatter(longitudes, latitudes, transform=ccrs.PlateCarree(globe=globe),

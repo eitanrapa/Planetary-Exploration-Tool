@@ -10,91 +10,28 @@ import cspyce as spice
 import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+import json
 
 
-class Nightingale(pet.component, family="pet.instruments.nightingale", implements=pet.protocols.instrument):
+class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", implements=pet.protocols.conOps):
     """
-    Defines the Nightingale mission instrument
+    Defines the Nightingale 5 to 1 ConOps
     """
 
     body_id = pet.properties.int()
     body_id.doc = "spk file body id"
 
-    start_look_angle = pet.properties.float()
-    start_look_angle.doc = "Starting look angle"
-
-    end_look_angle = pet.properties.float()
-    end_look_angle.doc = "Ending look angle"
-
     start_time = pet.properties.str()
     start_time.doc = "Start time of coverage"
 
-    wavelength = pet.properties.float()
-    wavelength.doc = "Radar wavelength"
-
-    def __init__(self, planet, **kwargs):
+    def __init__(self, planet, acquistion_cadence_path=None, **kwargs):
         super().__init__(**kwargs)
         self.planet = planet
-        times = self.convert_times(self.get_five_tracks(latitude_cutoff=0))
+        if acquistion_cadence_path is not None:
+            with open(acquistion_cadence_path) as json_file:
+                self.acquisition_cadence = json.load(json_file)
+        times = self.get_five_tracks()
         self.orbit_cycle = times[5] - times[0]
-
-    def _convert_times(self, times):
-        """
-        Converts a time string to Ephemeris Time using a loaded leap seconds file
-        :param times: String to be converted
-        :return: Ephemeris time float
-        """
-
-        # Convert time from string to ephemeris time
-        ets = [spice.str2et(str=time) for time in times]
-
-        # Return ephemeris time
-        return np.asanyarray(ets)
-
-    @pet.export
-    def convert_times(self, times):
-        """
-        Helper function for _convert_times
-        """
-
-        # Make sure times is a numpy array
-        times = np.asanyarray(times)
-
-        # Make sure dimensions is 1
-        if times.ndim == 0:
-            times = np.asanyarray([times])
-
-        # Call _Cartesian function for results
-        return self._convert_times(times=times)
-
-    def _convert_utcs(self, ets):
-        """
-        Converts ETs to time strings using the loaded leap seconds file
-        :param ets: Ephemeris times to be converted
-        :return: Time string
-        """
-
-        # Convert time to UTC
-        utcs = [spice.et2utc(et=et, format="c", prec=14) for et in ets]
-
-        # Return the strings
-        return utcs
-
-    @pet.export
-    def convert_utcs(self, ets):
-        """
-        Helper function for _convert_utcs
-        """
-
-        # Make sure times is a numpy array
-        ets = np.asanyarray(ets)
-
-        # Make sure dimensions is 1
-        if ets.ndim == 0:
-            ets = np.asanyarray([ets])
-
-        # Call _Cartesian function for results
-        return self._convert_utcs(ets=ets)
 
     def _get_states(self, times):
         """
@@ -137,8 +74,11 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         :return: Times at which the cutoffs occur
         """
 
+        # Create a time conversion instance
+        time_conversion = pet.spicetoolkit.timeConversion()
+
         # Generate the ephemeris times to look through for 1 second of temporal spacing
-        ets = [self.convert_times(times=self.start_time)[0] + i for i in range(162000)]  # 45 hour search
+        ets = [time_conversion.convert_times(times=self.start_time)[0] + i for i in range(162000)]  # 45 hour search
 
         # Get the positions from the states
         positions, velocities = self.get_states(times=ets)
@@ -158,7 +98,7 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         for i in range(len(geodetic_coordinates) - 1):
             # If the latitude cutoff is found, attach the time of the cutoff
             if (geodetic_coordinates[i, 0] < latitude_cutoff) and (geodetic_coordinates[i + 1, 0] > latitude_cutoff):
-                times.append(self.convert_utcs(ets[i])[0])
+                times.append(ets[i])
 
         # Return the times
         return times[1:7]
@@ -175,9 +115,12 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         :param return_fig: Whether to return the fig, ax, globe objects
         """
 
+        # Create a time conversion instance
+        time_conversion = pet.spicetoolkit.timeConversion()
+
         # Create list of times to observe at
-        times = np.arange(self.convert_times(times=start_time),
-                          self.convert_times(times=end_time) + temporal_resolution, temporal_resolution)
+        times = np.arange(time_conversion.convert_times(times=start_time),
+                          time_conversion.convert_times(times=end_time) + temporal_resolution, temporal_resolution)
 
         # Get the positions and velocities
         positions, velocities = self.get_states(times)
@@ -192,7 +135,6 @@ class Nightingale(pet.component, family="pet.instruments.nightingale", implement
         geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)[:, :3]
 
         if fig is None:
-
             # Get the projection
             fig, ax, globe = projection.proj(planet=self.planet)
 

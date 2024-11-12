@@ -14,7 +14,10 @@ fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Plane
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
                       "insar_6stride_26d_v7_seo.bsp", "latest_leapseconds.tls"])
 
-# Clear the files
-fm.clear()
+# Make a planet
+surface = pet.geophysical.surface()
+
+# Return an amplitude
+print(surface.sigma_wye(amplitude=1, incidence_angle=80))
 
 # end of file

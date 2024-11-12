@@ -8,7 +8,7 @@
 import pet
 
 # Create a file manager
-fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/other")
+fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input")
 
 # Furnish some files
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
@@ -18,49 +18,57 @@ fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tp
 planet = pet.planets.enceladus(name="enceladus")
 
 # Make an instrument
-instrument = pet.instruments.nightingale(name="nightingale", body_id=-303, start_look_angle=20, end_look_angle=30,
-                                         start_time="2046 DEC 20 15:10:40.134", wavelength=0.13, planet=planet)
+instrument = pet.instruments.chirpchirp(
+    instrument_parameters_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input/Parameters Sband.xlsx")
 
-# Make a displacement map
-deformation_map = pet.models.deformationMap(name="het",
-                                            displacement_data_path=
-                                            "/home/user/Documents/other/Simulation_Het_Results.hdf5",
-                                            planet=planet)
+# Make a con ops
+conops = pet.conOps.nightingale5to1(name="nightingale",
+                                    body_id=-303, start_time="2046 DEC 20 15:10:40.134", planet=planet)
+
 # Get the times defining the first five tracks
-times = instrument.get_five_tracks()
+times = conops.get_five_tracks()
 
 # Get the orbit cycle time of the instrument
-orbit_cycle_time = instrument.orbit_cycle
+orbit_cycle_time = conops.orbit_cycle
+
+# Make a displacement map
+deformation_map = pet.geophysical.deformationMap(name="het",
+                                                 displacement_data_path=
+                                                 "/home/user/Documents/GitHub/"
+                                                 "Planetary-Exploration-Tool/input/Simulation_Het_Results.hdf5",
+                                                 planet=planet)
 
 track1 = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
-                           temporal_resolution=20, spatial_resolution=2000)
-time_space1, swath1 = track1.calculate_ground_swath()
-time_space2 = time_space1 + orbit_cycle_time
+                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track1.load()
+
+track2 = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
+                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track2.load()
+track2.start_time = track1.start_time + orbit_cycle_time
+track2.end_time = track1.end_time + orbit_cycle_time
+track2.data["time"].values = track1.data["time"].values + orbit_cycle_time
 
 # Make an interferogram
 interferogram = pet.operations.interferogram(instrument=instrument, planet=planet, deformation_map=deformation_map,
-                                             swath1=swath1, swath2=swath1, time_space1=time_space1,
-                                             time_space2=time_space2, baseline=10)
+                                             track1=track1, track2=track2, conops=conops, baseline=10)
 interferogram.calculate_igram()
+# interferogram.load()
 
-# # Save interferogram
-# interferogram.save(path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files")
-
-# # Load interferogram
-# interferogram = pet.insar.simpleInterferogram(instrument=instrument, planet=planet,
-#                                               deformation_map=deformation_map,
-#                                               load_path="/files/base_0_0_1_interferogram.hdf5")
+# Save interferogram
+# interferogram.save()
 
 # Define a projection
 projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
                                            folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
 
 # Plot interferogram
-interferogram.visualize_interferogram(projection=projection)
+fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
+interferogram.visualize_interferogram(projection=projection, fig=fig, globe=globe, ax=ax)
 
 # Plot the displacements
-
-interferogram.visualize_displacements(projection=projection)
+# fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
+# interferogram.visualize_displacements(projection=projection, fig=fig, globe=globe, ax=ax)
 
 fm.clear()
 

@@ -8,7 +8,7 @@
 import pet
 
 # Create a file manager
-fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/other")
+fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input")
 
 # Furnish some files
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
@@ -18,25 +18,33 @@ fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tp
 planet = pet.planets.enceladus(name="enceladus")
 
 # Make an instrument
-instrument = pet.instruments.nightingale(name="nightingale", body_id=-303, start_look_angle=20, end_look_angle=30,
-                                         start_time="2046 DEC 20 15:10:40.134", wavelength=0.13, planet=planet)
+instrument = pet.instruments.chirpchirp(
+    instrument_parameters_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input/Parameters Sband.xlsx")
+
+# Make a con ops
+conops = pet.conOps.nightingale5to1(name="nightingale",
+                                    body_id=-303, start_time="2046 DEC 20 15:10:40.134", planet=planet)
 
 # Get the times defining the first five tracks
-times = instrument.get_five_tracks()
+times = conops.get_five_tracks()
 
 # Get the orbit cycle time of the instrument
-orbit_cycle_time = instrument.orbit_cycle
+orbit_cycle_time = conops.orbit_cycle
 
-track = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
+track = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, conops=conops, instrument=instrument,
                           temporal_resolution=20, spatial_resolution=2000)
 track.calculate_ground_swath()
+track.save()
+
+# track.load()
 
 # Define a projection
-projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
+projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-40,
                                            folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
 
-# Plot interferogram
-track.visualize_swath(projection=projection)
+# Plot the track
+fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
+track.visualize_swath(projection=projection, fig=fig, globe=globe, ax=ax)
 
 fm.clear()
 
