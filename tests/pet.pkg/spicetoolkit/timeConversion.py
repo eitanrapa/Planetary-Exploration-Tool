@@ -17,7 +17,26 @@ fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tp
 # Create a time conversion object
 time_conversion = pet.spicetoolkit.timeConversion()
 
-# Check conversions are consistent
-print(time_conversion.convert_utcs(time_conversion.convert_times("2046 DEC 20 15:10:40.134")))
+# Define a time
+utc = "2046 DEC 20 15:10:40.134"
+
+# Convert to utc
+et = time_conversion.convert_ets(utcs=utc)
+
+# Convert back
+utc_converted = time_conversion.convert_utcs(ets=et)
+
+print(utc, utc_converted)
+
+# Define a time
+utcs = ["2046 DEC 20 15:10:40.134", "2046 DEC 21 15:10:40.134"]
+
+# Convert to utc
+ets = time_conversion.convert_ets(utcs=utcs)
+
+# Convert back
+times_converted = time_conversion.convert_utcs(ets=ets)
+
+print(utcs, times_converted)
 
 # end of file

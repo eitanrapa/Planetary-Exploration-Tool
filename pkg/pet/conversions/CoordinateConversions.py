@@ -4,11 +4,12 @@
 #
 # the pet development team
 # (c) 2023-2024 all rights reserved
+
 import numpy as np
 import pet
 
 
-class Conversions(pet.component):
+class CoordinateConversions(pet.component):
     """
     Class that encapsulates conversions between Cartesian and Geodetic coordinates
     """
@@ -37,7 +38,6 @@ class Conversions(pet.component):
 
         # Iterate over the geodetic coordinates
         for i in range(len(geodetic_coordinates)):
-
             # Define a GeodeticPoint struct
             gp = pet.ext.pet.GeodeticPoint(latitude=geodetic_coordinates[i, 0],
                                            longitude=geodetic_coordinates[i, 1], height=geodetic_coordinates[i, 2])
@@ -51,7 +51,7 @@ class Conversions(pet.component):
             # Append the new Cartesian coordinates to list
             cartesian_coordinates.append([cp.x, cp.y, cp.z])
 
-        return np.asanyarray(cartesian_coordinates)
+        return np.asarray(cartesian_coordinates)
 
     def cartesian(self, geodetic_coordinates):
         """
@@ -59,15 +59,22 @@ class Conversions(pet.component):
         """
 
         # Make sure geodetic_coordinates is a numpy array
-        geodetic_coordinates = np.asanyarray(geodetic_coordinates)
+        geodetic_coordinates = np.asarray(geodetic_coordinates)
 
         # Make sure dimensions is 2
+        single_return = False
         if geodetic_coordinates.ndim == 1:
-
-            geodetic_coordinates = np.asanyarray([geodetic_coordinates])
+            single_return = True
+            geodetic_coordinates = np.asarray([geodetic_coordinates])
 
         # Call _Cartesian function for results
-        return self._cartesian(geodetic_coordinates=geodetic_coordinates)
+        cartesian_coordinates = self._cartesian(geodetic_coordinates=geodetic_coordinates)
+
+        # Strip array if ndim is 1
+        if single_return:
+            return cartesian_coordinates[0]
+        else:
+            return cartesian_coordinates
 
     def _geodetic(self, cartesian_coordinates, tol):
         """
@@ -84,7 +91,6 @@ class Conversions(pet.component):
         geodetic_coordinates = []
 
         for i in range(len(cartesian_coordinates)):
-
             # Define an empty GeodeticPoint struct to be modified
             gp = pet.ext.pet.GeodeticPoint(latitude=0, longitude=0, height=0)
 
@@ -96,9 +102,9 @@ class Conversions(pet.component):
             iterations = pet.ext.pet.geodetic(te=te, cp=cp, gp=gp, tol=tol)
 
             # Append the new geodetic coordinates to list
-            geodetic_coordinates.append([gp.latitude, gp.longitude, gp.height, iterations])
+            geodetic_coordinates.append([gp.latitude, gp.longitude, gp.height])
 
-        return np.asanyarray(geodetic_coordinates)
+        return np.asarray(geodetic_coordinates)
 
     def geodetic(self, cartesian_coordinates, tol=1.0e-9):
         """
@@ -106,14 +112,21 @@ class Conversions(pet.component):
         """
 
         # Make sure cartesian_coordinates is a numpy array
-        cartesian_coordinates = np.asanyarray(cartesian_coordinates)
+        cartesian_coordinates = np.asarray(cartesian_coordinates)
 
         # Make sure dimensions is 2
+        single_return = False
         if cartesian_coordinates.ndim == 1:
-
-            cartesian_coordinates = np.asanyarray([cartesian_coordinates])
+            single_return = True
+            cartesian_coordinates = np.asarray([cartesian_coordinates])
 
         # Call _Geodetic function for results
-        return self._geodetic(cartesian_coordinates=cartesian_coordinates, tol=tol)
+        geodetic_coordinates = self._geodetic(cartesian_coordinates=cartesian_coordinates, tol=tol)
+
+        # Strip array if ndim is 1
+        if single_return:
+            return geodetic_coordinates[0]
+        else:
+            return geodetic_coordinates
 
 # end of file

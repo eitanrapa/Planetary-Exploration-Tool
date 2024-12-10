@@ -6,6 +6,5 @@
 # (c) 2023-2024 all rights reserved
 
 from .DeformationMap import DeformationMap as deformationMap
-from .Surface import Surface as surface
 
 # end of file

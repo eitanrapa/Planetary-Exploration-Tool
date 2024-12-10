@@ -25,6 +25,15 @@ conops = pet.conOps.nightingale5to1(name="nightingale",
 projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
                                            folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
 
+# Create a time conversion instance
+time_conversion = pet.spicetoolkit.timeConversion()
+
+utc = "2046 DEC 20 15:10:40.134"
+
+et = time_conversion.convert_ets(utcs=utc)
+
+position, velocity = conops.get_states(times=et)
+
 # Plot the orbit
 conops.plot_orbit(start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 22 03:10:40.134",
                   projection=projection)

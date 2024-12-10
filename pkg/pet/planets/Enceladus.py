@@ -20,6 +20,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
 
     body_id = "602"
     reference_id = "IAU_ENCELADUS"
+    tidal_cycle = 118386.8352
 
     @pet.export
     def get_axes(self):
@@ -37,7 +38,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         c = c * 1e3
 
         # Return the axes
-        return a, b, c
+        return np.asarray([a, b, c])
 
     @pet.export
     def get_surface_intersects(self, vectors):
@@ -58,7 +59,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
                       vector in vectors]
 
         # Convert to meters
-        intersects = np.asanyarray(intersects) * 1e3
+        intersects = np.asarray(intersects) * 1e3
 
         # Return the intersects
         return intersects
@@ -78,8 +79,8 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
                                                           abcorr="None", obsrvr=str(conops.body_id))[::2]
 
         # Convert to meters
-        sub_points = np.asanyarray(sub_points) * 1e3
-        distances = np.asanyarray(spice.vnorm_vector(v1=surface_vectors)) * 1e3
+        sub_points = np.asarray(sub_points) * 1e3
+        distances = np.asarray(spice.vnorm_vector(v1=surface_vectors)) * 1e3
 
         # Return sub-observation points and distances of vectors
         return sub_points, distances
@@ -108,10 +109,10 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         a, b, c = self.get_axes()
 
         # Create a coordinate conversion object
-        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
+        coordinate_conversions = pet.conversions.coordinateConversions(name="conversions", a=a, b=b, c=c)
 
-        # Convert coordinate vertices
-        geodetic_coordinates = convert.geodetic(cartesian_coordinates=np.asarray([x, y, z]).T)[:, :3]
+        # coordinate_conversions coordinate vertices
+        geodetic_coordinates = coordinate_conversions.geodetic(cartesian_coordinates=np.asarray([x, y, z]).T)
 
         if fig is None:
 
@@ -155,9 +156,9 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         plt.colorbar(im, label="Heights [m]")
 
         # Add labels and legend
-        ax.set_title('Topography', pad=20)
+        plt.title('Topography', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/topography.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/enceladus_topography.png', format='png', dpi=500)
 
 # end of file
