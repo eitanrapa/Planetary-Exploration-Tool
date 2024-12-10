@@ -12,10 +12,10 @@ import numpy as np
 
 class TimeConversion(pet.component):
     """
-
+    Class that encapsulates time conversions
     """
 
-    def _convert_times(self, times):
+    def _convert_ets(self, utcs):
         """
         Converts a time string to Ephemeris Time using a loaded leap seconds file
         :param times: String to be converted
@@ -23,25 +23,33 @@ class TimeConversion(pet.component):
         """
 
         # Convert time from string to ephemeris time
-        ets = [spice.str2et(str=time) for time in times]
+        ets = [spice.str2et(str=utc) for utc in utcs]
 
         # Return ephemeris time
-        return np.asanyarray(ets)
+        return np.asarray(ets)
 
-    def convert_times(self, times):
+    def convert_ets(self, utcs):
         """
-        Helper function for _convert_times
+        Helper function for _convert_ets
         """
 
         # Make sure times is a numpy array
-        times = np.asanyarray(times)
+        utcs = np.asarray(utcs)
 
         # Make sure dimensions is 1
-        if times.ndim == 0:
-            times = np.asanyarray([times])
+        single_return = False
+        if utcs.ndim == 0:
+            single_return = True
+            utcs = np.asarray([utcs])
 
         # Call _Cartesian function for results
-        return self._convert_times(times=times)
+        ets = self._convert_ets(utcs=utcs)
+
+        # Strip array if ndim is 0
+        if single_return:
+            return ets[0]
+        else:
+            return ets
 
     def _convert_utcs(self, ets):
         """
@@ -62,13 +70,21 @@ class TimeConversion(pet.component):
         """
 
         # Make sure times is a numpy array
-        ets = np.asanyarray(ets)
+        ets = np.asarray(ets)
 
         # Make sure dimensions is 1
+        single_return = False
         if ets.ndim == 0:
-            ets = np.asanyarray([ets])
+            single_return = True
+            ets = np.asarray([ets])
 
         # Call _Cartesian function for results
-        return self._convert_utcs(ets=ets)
+        utcs = self._convert_utcs(ets=ets)
+
+        # Strip array if ndim is 1
+        if single_return:
+            return utcs[0]
+        else:
+            return utcs
 
 # end of file

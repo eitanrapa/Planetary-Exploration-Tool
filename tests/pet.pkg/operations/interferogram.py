@@ -38,37 +38,45 @@ deformation_map = pet.geophysical.deformationMap(name="het",
                                                  "Planetary-Exploration-Tool/input/Simulation_Het_Results.hdf5",
                                                  planet=planet)
 
-track1 = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track1 = pet.operations.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track1.load()
+start_time = track1.start_time
+end_time = track1.end_time
+times_values = track1.data["time"].values
 
-track2 = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track2 = pet.operations.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track2.load()
-track2.start_time = track1.start_time + orbit_cycle_time
-track2.end_time = track1.end_time + orbit_cycle_time
-track2.data["time"].values = track1.data["time"].values + orbit_cycle_time
 
-# Make an interferogram
+track2.start_time = start_time + orbit_cycle_time
+track2.end_time = end_time + orbit_cycle_time
+track2.data["time"].values = times_values + orbit_cycle_time
+
 interferogram = pet.operations.interferogram(instrument=instrument, planet=planet, deformation_map=deformation_map,
                                              track1=track1, track2=track2, conops=conops, baseline=10)
+
+# Calculate interferogram
 interferogram.calculate_igram()
-# interferogram.load()
 
 # Save interferogram
 # interferogram.save()
 
+# # Load the interferogram
+interferogram.load()
+
 # Define a projection
-projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
-                                           folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
+projection = pet.projections.biaxialCylindrical(name="biaxial cylindrical",
+                                                folder_path=
+                                                "/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
 
 # Plot interferogram
 fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
 interferogram.visualize_interferogram(projection=projection, fig=fig, globe=globe, ax=ax)
 
 # Plot the displacements
-# fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
-# interferogram.visualize_displacements(projection=projection, fig=fig, globe=globe, ax=ax)
+fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
+interferogram.visualize_displacements(projection=projection, fig=fig, globe=globe, ax=ax)
 
 fm.clear()
 

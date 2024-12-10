@@ -34,30 +34,34 @@ class Track:
 
     def save(self):
         """
-        Save the interferogram to an HDF5 file
+        Save the track to an HDF5 file
         :return: Nothing returned
         """
 
         # Open HDF5 file
-        repo = git.Repo('.', search_parent_directories=True)
+        repo = git.Repo('../operations', search_parent_directories=True)
         self.data.to_netcdf(repo.working_tree_dir + '/files/track_' + str(self.conOps.body_id) + '_'
                             + str(self.start_time) + '_' + str(self.end_time) + ".nc")
 
     def load(self):
         """
-        Load a hdf5 file containing a previous SimpleInterferogram object
+        Load a hdf5 file containing a previous track object
         :return: Nothing returned
         """
 
         # Open the HDF5 file in read mode
-        repo = git.Repo('.', search_parent_directories=True)
+        repo = git.Repo('../operations', search_parent_directories=True)
         data = xr.open_dataset(repo.working_tree_dir + '/files/track_' + str(self.conOps.body_id) + '_'
                                + str(self.start_time) + '_' + str(self.end_time) + ".nc")
         self.data = data
 
     def create_data_array(self, cartesian_coordinates, geodetic_coordinates, look_angles, times):
         """
-
+        Create a xarray with the input data
+        :param cartesian_coordinates: x, y, z coordinates to be saved
+        :param geodetic_coordinates: lat, long, height coordinates to be saved
+        :param look_angles: Calculated look angles from satellite
+        :param times: Times of observation for points
         """
 
         # Create the xarray Dataset
@@ -66,12 +70,13 @@ class Track:
             dims=["points"],
             coords={
                 "time": ("points", times),
-                "x": ("points", np.asanyarray([point[0] for point in cartesian_coordinates])),
-                "y": ("points", np.asanyarray([point[1] for point in cartesian_coordinates])),
-                "z": ("points", np.asanyarray([point[2] for point in cartesian_coordinates])),
-                "latitude": ("points", np.asanyarray([point[0] for point in geodetic_coordinates])),
-                "longitude": ("points", np.asanyarray([point[1] for point in geodetic_coordinates])),
-                "height": ("points", np.asanyarray([point[2] for point in geodetic_coordinates]))},
+                "x": ("points", np.asarray([point[0] for point in cartesian_coordinates])),
+                "y": ("points", np.asarray([point[1] for point in cartesian_coordinates])),
+                "z": ("points", np.asarray([point[2] for point in cartesian_coordinates])),
+                "latitude": ("points", np.asarray([point[0] for point in geodetic_coordinates])),
+                "longitude": ("points", np.asarray([point[1] for point in geodetic_coordinates])),
+                "height": ("points", np.asarray([point[2] for point in geodetic_coordinates]))},
+            name="look_angles",
             attrs=dict(
                 body_id=self.conOps.body_id,
                 start_time=self.start_time,
@@ -79,18 +84,25 @@ class Track:
             ),
         )
 
+        # Save xarray to object
         self.data = da
 
     def convert_positions(self, flattened_points):
+        """
+        Convert flattened points to geodetic coordinates
+        :param flattened_points: Points to convert
+        :return: Points in geodetic coordinates
+        """
 
         # Get planet axes
         a, b, c = self.planet.get_axes()
 
         # Create a coordinate conversion object
-        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
+        coordinate_conversions = pet.conversions.coordinateConversions(name="conversions", a=a, b=b, c=c)
 
         # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
-        flattened_swath_coordinates = np.asanyarray(convert.geodetic(cartesian_coordinates=flattened_points)[:, :3])
+        flattened_swath_coordinates = np.asarray(coordinate_conversions.geodetic(
+            cartesian_coordinates=flattened_points))
 
         return flattened_swath_coordinates
 
@@ -109,7 +121,7 @@ class Track:
         num_theta = int((2 * np.pi / self.spatial_resolution) * np.average((a, b, c)))
 
         # Get positions and velocities of the satellite for the observation times
-        satellite_positions, satellite_velocities = self.conOps.get_states(times=time_space[:])
+        satellite_positions, satellite_velocities = self.conOps.get_states(times=time_space)
 
         # Create the SPICE planes with the normal as the satellite velocities originating at planet center
         planes = spice.nvp2pl_vector(normal=satellite_velocities, point=[0, 0, 0])
@@ -164,10 +176,10 @@ class Track:
             swath_beams[i] = [swath_beams[i][index] for index in indices]
             look_angles[i] = [look_angles[i][index] for index in indices]
 
-        flat_positions = np.asanyarray([coord for sublist in swath_beams for coord in sublist])
-        flat_angles = np.asanyarray([angle for sublist in look_angles for angle in sublist])
+        flat_positions = np.asarray([coord for sublist in swath_beams for coord in sublist])
+        flat_angles = np.asarray([angle for sublist in look_angles for angle in sublist])
         times = [[time] * len(beams) for time, beams in zip(time_space, swath_beams)]
-        flat_times = np.asanyarray([time for sublist in times for time in sublist])
+        flat_times = np.asarray([time for sublist in times for time in sublist])
         swath_coordinates = self.convert_positions(flattened_points=flat_positions)
 
         self.create_data_array(cartesian_coordinates=flat_positions, geodetic_coordinates=swath_coordinates,
@@ -176,6 +188,7 @@ class Track:
     def check_limbs(self, swath_beams, satellite_positions):
         """
         Check if all the swath_beam rays from satellite to surface positions intersect the limb ellipse.
+        :param swath_beams: Azimuthal beams of the swath
         :param satellite_positions: Array of x, y, z, positions of the satellite [m]
         :return: A list of values whether the points on the ground are before or after the limb point.
         """
@@ -214,6 +227,7 @@ class Track:
         """
         Determine whether a set of points on the surface of the Earth are to the left or right of the satellite's
         velocity vectors
+        :param swath_beams: Azimuthal beams of the swath
         :param satellite_positions: Array of x, y, z, positions of the satellite [m]
         :param satellite_velocities: Array of x, y, z, velocity vectors of the satellite [m/s]
         :return: A list containing whether the points are to the left or right of their corresponding satellite velocity
@@ -257,6 +271,7 @@ class Track:
     def get_angles_cartesian(self, swath_beams, times, satellite_positions):
         """
         Get the look angles between the GroundTargets and the satellite in degrees.
+        :param swath_beams: Azimuthal beams of the swath
         :param times: Times of observation
         :param satellite_positions: Array of x, y, z, positions of the satellite
         :return: Absolute look angle between the surface points and the corresponding satellite position in degrees
@@ -324,9 +339,10 @@ class Track:
             return fig, ax, globe
 
         # Add labels and legend
-        ax.set_title('Swath', pad=20)
+        plt.title('Swath', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/swath.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/swath_' + str(self.conOps.body_id) + '_' +
+                    str(self.start_time) + '_' + str(self.end_time) + '.png', format='png', dpi=500)
 
 # end of file

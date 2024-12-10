@@ -36,17 +36,12 @@ class Interferogram(pet.component):
         :return: Nothing returned
         """
 
-        body_id = self.track1.data.attrs["body_id"]
-        start_time1 = self.track1.data.attrs["start_time"]
-        end_time1 = self.track1.data.attrs["end_time"]
-        start_time2 = self.track2.data.attrs["start_time"]
-        end_time2 = self.track2.data.attrs["end_time"]
-
         # Open HDF5 file
         repo = git.Repo('.', search_parent_directories=True)
         self.data.to_netcdf(repo.working_tree_dir + '/files/igram_' + self.deformation_map.pyre_name + '_' +
-                            str(body_id) + '_' + str(start_time1) + '_' + str(end_time1) +
-                            str(start_time2) + '_' + str(end_time2) + ".nc")
+                            str(self.conOps.body_id) + '_' + str(self.track1.start_time) + '_' +
+                            str(self.track1.end_time) + '_' + str(self.track2.start_time) + '_' +
+                            str(self.track2.end_time) + ".nc")
 
     def load(self):
         """
@@ -54,57 +49,36 @@ class Interferogram(pet.component):
         :return: Nothing returned
         """
 
-        bodyd_id = self.track1.data.attrs.get("body_id")
-        start_time1 = self.track1.data.attrs.get("start_time")
-        end_time1 = self.track1.data.attrs.get("end_time")
-        start_time2 = self.track2.data.attrs.get("start_time")
-        end_time2 = self.track2.data.attrs.get("end_time")
-
         # Open the HDF5 file in read mode
         repo = git.Repo('.', search_parent_directories=True)
         data = xr.open_dataset(repo.working_tree_dir + '/files/igram_' + self.deformation_map.pyre_name + '_' +
-                               str(bodyd_id) + '_' + str(start_time1) + '_' + str(end_time1) +
-                               str(start_time2) + '_' + str(end_time2) + ".nc")
+                               str(self.conOps.body_id) + '_' + str(self.track1.start_time) + '_' +
+                               str(self.track1.end_time) + '_' + str(self.track2.start_time) + '_' +
+                               str(self.track2.end_time) + ".nc")
         self.data = data
 
-    def create_data_array(self, phases, los_displacements):
+    def create_data_array(self, los_displacements, psis):
         """
-
+        Create a xarray with the input data
+        :param los_displacements: displacement values measured in the LOS
+        :param psis: Flattened values
         """
-
-        # Create the xarray Dataset
-        phases_da = xr.DataArray(
-            data=phases,
-            dims=["points"],
-            coords={
-                "time": ("points", self.track1.data["time"].values),
-                "x": ("points", self.track1.data["x"].values),
-                "y": ("points", self.track1.data["y"].values),
-                "z": ("points", self.track1.data["z"].values),
-                "latitude": ("points", self.track1.data["latitude"].values),
-                "longitude": ("points", self.track1.data["longitude"].values),
-                "height": ("points", self.track1.data["height"].values)},
-            attrs=dict(
-                body_id=self.conOps.body_id,
-                start_time1=self.track1.start_time,
-                end_time1=self.track1.end_time,
-                start_time2=self.track1.start_time,
-                end_time2=self.track2.end_time,
-            ),
-        )
 
         # Create the xarray Dataset
         los_displacements_da = xr.DataArray(
             data=los_displacements,
             dims=["points"],
             coords={
-                "time": ("points", self.track1.data["time"].values),
+                "time1": ("points", self.track1.data["time"].values),
+                "time2": ("points", self.track2.data["time"].values),
+                "psi": ("points", psis),
                 "x": ("points", self.track1.data["x"].values),
                 "y": ("points", self.track1.data["y"].values),
                 "z": ("points", self.track1.data["z"].values),
                 "latitude": ("points", self.track1.data["latitude"].values),
                 "longitude": ("points", self.track1.data["longitude"].values),
                 "height": ("points", self.track1.data["height"].values)},
+            name="los_displacements",
             attrs=dict(
                 body_id=self.conOps.body_id,
                 start_time1=self.track1.start_time,
@@ -114,13 +88,7 @@ class Interferogram(pet.component):
             ),
         )
 
-        # Create a Dataset
-        dataset = xr.Dataset({
-            "phases": phases_da,
-            "los_displacements": los_displacements_da,
-        })
-
-        self.data = dataset
+        self.data = los_displacements_da
 
     def get_flattened_angles(self, time, satellite_position, flat_positions):
         """
@@ -154,6 +122,13 @@ class Interferogram(pet.component):
         return look_angles_radians
 
     def get_flattened_positions(self, positions, satellite_position):
+        """
+        Calculate the "flattened positions", or those in the plane of the observed positions from the satellite point
+        of view
+        :param positions: Positions on the DSK
+        :param satellite_position: Positions of the satellite when measuring positions
+        :return x, y, z coordinates of the flattened positions
+        """
 
         # Get planet axes
         a, b, c = self.planet.get_axes()
@@ -178,9 +153,6 @@ class Interferogram(pet.component):
         Calculate the flattened phases between two swaths given a baseline
         :return: Nothing returned 
         """
-
-        # Get planet axes
-        a, b, c = self.planet.get_axes()
 
         # For speed, calculate all points at once
         u_displacements, v_displacements, w_displacements = (
@@ -209,11 +181,8 @@ class Interferogram(pet.component):
         angles = self.get_flattened_angles(time=self.track1.data["time"].values,
                                            satellite_position=satellite_positions, flat_positions=flattened_points)
 
-        # Calculate geodetic heights of each of the ground points
-        geodetic_heights = spice.nearpt_vector(positn=positions, a=a, b=b, c=c)[1]
-
         # Get the distances from the flattened points to the satellites
-        vectors = positions - satellite_positions
+        vectors = flattened_points - satellite_positions
         distances = np.asarray([np.linalg.norm(vector) for vector in vectors])
 
         # Calculate the vectors from the ground points to the satellite positions
@@ -226,22 +195,19 @@ class Interferogram(pet.component):
                                          in zip(displacements_1, ground_satellite_vectors)])
 
         # Calculate the line of sight displacements given the satellite positions for the second swath
-        los_displacements2 = np.asanyarray([(np.dot(displacement, ground_satellite_vector) /
-                                             np.linalg.norm(ground_satellite_vector))
-                                            for displacement, ground_satellite_vector
-                                            in zip(displacements_2, ground_satellite_vectors)])
+        los_displacements2 = np.asarray([(np.dot(displacement, ground_satellite_vector) /
+                                          np.linalg.norm(ground_satellite_vector))
+                                         for displacement, ground_satellite_vector
+                                         in zip(displacements_2, ground_satellite_vectors)])
 
+        # Calculate displacement differences
         los_displacements = los_displacements2 - los_displacements1
 
-        # Calculate the phases using the LOS displacements, baseline, geodetic heights, distances, angles
-        phases = 4 * np.pi * (1 / self.instrument.wavelength) * (los_displacements -
-                                                                 ((self.baseline * geodetic_heights) /
-                                                                  (distances * np.sin(angles))))
+        # Calculate flattened values
+        psis = self.baseline / (distances * np.sin(angles))
 
-        phases = np.fmod(phases, 2 * np.pi)
-        phases = [angle + 2 * np.pi if angle < 0 else angle for angle in phases]
-
-        self.create_data_array(phases=phases, los_displacements=los_displacements)
+        # Create array and save the data
+        self.create_data_array(los_displacements=los_displacements, psis=psis)
 
     def visualize_interferogram(self, projection, fig=None, globe=None, ax=None, return_fig=False):
         """
@@ -258,9 +224,19 @@ class Interferogram(pet.component):
             # Get the projection
             fig, ax, globe = projection.proj(planet=self.planet)
 
+        # Load the values to plot
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
-        phases = self.data["phases"].values
+        heights = self.data["height"].values
+        los_displacements = self.data["los_displacements"].values
+        psis = self.data["psi"].values
+
+        # Calculate the phases using the LOS displacements, baseline, geodetic heights, distances, angles
+        phases = 4 * np.pi * (1 / self.instrument.wavelength) * (los_displacements - (psis * heights))
+
+        # Wrap interferogram
+        phases = np.fmod(phases, 2 * np.pi)
+        phases = [angle + 2 * np.pi if angle < 0 else angle for angle in phases]
 
         # Make the colormap cyclical
         cm = plt.cm.get_cmap('hsv')
@@ -277,10 +253,14 @@ class Interferogram(pet.component):
         plt.colorbar(im, label="Phase")
 
         # Add labels and legend
-        ax.set_title('Interferogram', pad=20)
+        plt.title('Interferogram', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/' + 'interferogram_no_baseline.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/' + 'interferogram_' + self.deformation_map.pyre_name + '_' +
+                    str(self.conOps.body_id) + '_' + str(self.track1.start_time) + '_' + str(
+                        self.track1.end_time) +
+                    '_' + str(self.track2.start_time) + '_' + str(self.track2.end_time) + '.png', format='png',
+                    dpi=500)
 
     def visualize_displacements(self, projection, fig=None, globe=None, ax=None, return_fig=False):
         """
@@ -297,6 +277,7 @@ class Interferogram(pet.component):
             # Get the projection
             fig, ax, globe = projection.proj(planet=self.planet)
 
+        # Load the values to plot
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
         los_displacements = self.data["los_displacements"].values
@@ -310,12 +291,16 @@ class Interferogram(pet.component):
             return fig, ax, globe
 
         # Add colorbar
-        plt.colorbar(im, label="Phase")
+        plt.colorbar(im, label="Displacement")
 
         # Add labels and legend
-        ax.set_title('Interferogram', pad=20)
+        plt.title('LOS displacements', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/' + 'displacements.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/' + 'displacements_' + self.deformation_map.pyre_name + '_' +
+                    str(self.conOps.body_id) + '_' + str(self.track1.start_time) + '_' + str(
+                        self.track1.end_time) +
+                    '_' + str(self.track2.start_time) + '_' + str(self.track2.end_time) + '.png', format='png',
+                    dpi=500)
 
 # end of file

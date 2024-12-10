@@ -36,11 +36,11 @@ class FileManager:
         """
 
         # Make sure names_list is a numpy array
-        names_list = np.asanyarray(names_list)
+        names_list = np.asarray(names_list)
 
         # Make sure dimensions is 1
         if names_list.ndim == 0:
-            names_list = np.asanyarray([names_list])
+            names_list = np.asarray([names_list])
 
         # Check list is made of strings
         for name in names_list:

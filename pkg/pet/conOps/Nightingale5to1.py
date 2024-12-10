@@ -10,7 +10,6 @@ import cspyce as spice
 import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
-import json
 
 
 class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", implements=pet.protocols.conOps):
@@ -24,12 +23,9 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
     start_time = pet.properties.str()
     start_time.doc = "Start time of coverage"
 
-    def __init__(self, planet, acquistion_cadence_path=None, **kwargs):
+    def __init__(self, planet, **kwargs):
         super().__init__(**kwargs)
         self.planet = planet
-        if acquistion_cadence_path is not None:
-            with open(acquistion_cadence_path) as json_file:
-                self.acquisition_cadence = json.load(json_file)
         times = self.get_five_tracks()
         self.orbit_cycle = times[5] - times[0]
 
@@ -45,8 +41,8 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
                                     abcorr="None", obs=self.body_id)
 
         # Separate positions and velocities, convert to meters
-        positions = np.asanyarray(states[0])[:, :3] * 1e3
-        velocities = np.asanyarray(states[0])[:, 3:6] * 1e3
+        positions = np.asarray(states[0])[:, :3] * 1e3
+        velocities = np.asarray(states[0])[:, 3:6] * 1e3
 
         # Return positions and velocities
         return positions, velocities
@@ -58,14 +54,22 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
         """
 
         # Make sure times is a numpy array
-        times = np.asanyarray(times)
+        times = np.asarray(times)
 
         # Make sure dimensions is 1
+        single_return = False
         if times.ndim == 0:
-            times = np.asanyarray([times])
+            single_return = True
+            times = np.asarray([times])
 
-        # Return positions and velocities
-        return self._get_states(times=times)
+        # Get positions and velocities
+        positions, velocities = self._get_states(times=times)
+
+        # Strip array if ndim is 0
+        if single_return:
+            return positions[0], velocities[0]
+        else:
+            return positions, velocities
 
     def get_five_tracks(self, latitude_cutoff=0):
         """
@@ -78,7 +82,7 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
         time_conversion = pet.spicetoolkit.timeConversion()
 
         # Generate the ephemeris times to look through for 1 second of temporal spacing
-        ets = [time_conversion.convert_times(times=self.start_time)[0] + i for i in range(162000)]  # 45 hour search
+        ets = [time_conversion.convert_ets(utcs=self.start_time) + i for i in range(162000)]  # 45 hour search
 
         # Get the positions from the states
         positions, velocities = self.get_states(times=ets)
@@ -90,10 +94,10 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
         a, b, c = self.planet.get_axes()
 
         # Create a coordinate conversion object
-        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
+        coordinate_conversions = pet.conversions.coordinateConversions(name="conversions", a=a, b=b, c=c)
 
         # Get the geodetic coordinates
-        geodetic_coordinates = np.asarray(convert.geodetic(cartesian_coordinates=positions))
+        geodetic_coordinates = np.asarray(coordinate_conversions.geodetic(cartesian_coordinates=positions))
 
         for i in range(len(geodetic_coordinates) - 1):
             # If the latitude cutoff is found, attach the time of the cutoff
@@ -112,6 +116,9 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
         :param start_time: Start time of orbit plotting
         :param end_time: End time of orbit plotting
         :param temporal_resolution: Time interval for plot points
+        :param fig: matplotlib figure
+        :param globe: cartopy globe
+        :param ax: matplotlib ax
         :param return_fig: Whether to return the fig, ax, globe objects
         """
 
@@ -119,8 +126,8 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
         time_conversion = pet.spicetoolkit.timeConversion()
 
         # Create list of times to observe at
-        times = np.arange(time_conversion.convert_times(times=start_time),
-                          time_conversion.convert_times(times=end_time) + temporal_resolution, temporal_resolution)
+        times = np.arange(time_conversion.convert_ets(utcs=start_time),
+                          time_conversion.convert_ets(utcs=end_time) + temporal_resolution, temporal_resolution)
 
         # Get the positions and velocities
         positions, velocities = self.get_states(times)
@@ -129,10 +136,10 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
         a, b, c = self.planet.get_axes()
 
         # Create a coordinate conversion object
-        convert = pet.ext.conversions(name="conversions", a=a, b=b, c=c)
+        coordinate_conversions = pet.conversions.coordinateConversions(name="conversions", a=a, b=b, c=c)
 
         # Get geodetic coordinates
-        geodetic_coordinates = convert.geodetic(cartesian_coordinates=positions)[:, :3]
+        geodetic_coordinates = coordinate_conversions.geodetic(cartesian_coordinates=positions)[:, :3]
 
         if fig is None:
             # Get the projection
@@ -151,9 +158,9 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
             return fig, ax, globe
 
         # Add labels and legend
-        ax.set_title('Orbit', pad=20)
+        plt.title('Orbit', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/orbit.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/nightingale_orbit.png', format='png', dpi=500)
 
 # end of file

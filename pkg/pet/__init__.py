@@ -47,8 +47,10 @@ from . import conOps
 from . import instruments
 # geophysical
 from . import geophysical
-# mission
-from . import mission
+# simulations
+from . import simulations
+# conversions
+from . import conversions
 # operations
 from . import operations
 # projections

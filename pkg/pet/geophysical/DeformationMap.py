@@ -25,6 +25,35 @@ class DeformationMap(pet.component):
         self.displacement_data_path = pathlib.PosixPath(displacement_data_path)
         self.planet = planet
 
+        def enu_to_cartesian_cubes(self, east_cube, north_cube, up_cube, latitudes, longitudes):
+            """
+            Function that converts between local east, north, up vectors and ellipsoidal center x, y, z vectors.
+            Also needs local coordinates.
+            :param east_cube: local east pointing cube
+            :param north_cube: local north pointing cube
+            :param up_cube: local up pointing cube
+            :param latitudes: local latitude of points
+            :param longitudes: local longitude of points
+            :return: u, v, w vector
+            """
+
+            # Convert longitude and latitude to radians
+            longitude = np.deg2rad(longitudes)
+            latitude = np.deg2rad(latitudes)
+
+            # Reshape longitudes and latitudes for broadcasting
+            longitude = longitude[:, np.newaxis, np.newaxis]
+            latitude = latitude[np.newaxis, :, np.newaxis]
+
+            # Calculate vector transformation
+            t = np.cos(latitude) * up_cube - np.sin(latitude) * north_cube
+            w = np.sin(latitude) * up_cube + np.cos(latitude) * north_cube
+            u = np.cos(longitude) * t - np.sin(longitude) * east_cube
+            v = np.sin(longitude) * t + np.cos(longitude) * east_cube
+
+            # Return the vector
+            return np.asarray([u, v, w])
+
     def read_displacements(self):
         """
         Returns the latitudes, longitudes, times, and cycle time of the data cubes representing the surface displacement
@@ -55,38 +84,11 @@ class DeformationMap(pet.component):
         # Return the retrieved values
         return colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube
 
-    def enu_to_cartesian_vector(self, east, north, up, latitude, longitude):
-        """
-        Function that converts between local east, north, up vectors and ellipsoidal center x, y, z vectors.
-        Also needs local coordinates.
-        :param east: local east vector
-        :param north: local north vector
-        :param up: local up vector
-        :param latitude: local latitude of point
-        :param longitude: local longitude of point
-        :return: u, v, w vector
-        """
-
-        # Convert longitude and latitude to radians
-        longitude = np.deg2rad(longitude)
-        latitude = np.deg2rad(latitude)
-
-        # Reshape longitudes and latitudes for broadcasting
-        longitude = longitude[:, np.newaxis, np.newaxis]
-        latitude = latitude[np.newaxis, :, np.newaxis]
-
-        # Calculate vector transformation
-        t = np.cos(latitude) * up - np.sin(latitude) * north
-        w = np.sin(latitude) * up + np.cos(latitude) * north
-        u = np.cos(longitude) * t - np.sin(longitude) * east
-        v = np.sin(longitude) * t + np.cos(longitude) * east
-
-        # Return the vector
-        return [u, v, w]
-
     def get_displacements(self, track):
         """
-
+        Get surface displacements for the positions defined by a track
+        :param track: object for which to find displacements for longitudes and latitudes
+        :return: displacements in local cartesian vectors
         """
 
         # Read the necessary data
@@ -95,10 +97,12 @@ class DeformationMap(pet.component):
         # Convert colatitudes to latitudes
         latitudes = 90 - colatitudes
 
+        vector_conversions = pet.conversions.vectorConversions()
+
         # Convert cubes of east, north, up vectors to u, v, w (local x, y, z coordinates)
-        u_cube, v_cube, w_cube = self.enu_to_cartesian_vector(east=east_cube, north=north_cube,
-                                                              up=up_cube,
-                                                              latitude=latitudes, longitude=longitudes)
+        u_cube, v_cube, w_cube = vector_conversions.enu_to_cartesian_cubes(east_cube=east_cube, north_cube=north_cube,
+                                                                           up_cube=up_cube,
+                                                                           latitudes=latitudes, longitudes=longitudes)
 
         # Stack the u, v, w arrays along a new axis to create a 4D array
         total_cube = np.stack((u_cube, v_cube, w_cube), axis=-1)
@@ -114,7 +118,7 @@ class DeformationMap(pet.component):
         time_space = track.data["time"].values
 
         # Convert longitudes to 0 - 360 format
-        modified_longs = np.asanyarray(longitudes) % 360
+        modified_longs = np.asarray(longitudes) % 360
 
         # Calculate the fractional time corresponding to the cycle
         modified_times = (np.array(time_space) % cycle_time) / cycle_time
@@ -138,7 +142,6 @@ class DeformationMap(pet.component):
         """
 
         if fig is None:
-
             # Get the projection
             fig, ax, globe = projection.proj(planet=self.planet)
 
@@ -160,7 +163,7 @@ class DeformationMap(pet.component):
                     time_series = east_cube[i, j, :]
 
                     # Create the interpolator function
-                    interpolator = interp1d(times, time_series, kind='linear', bounds_error=True)
+                    interpolator = interp1d(x=times, y=time_series, kind='linear', bounds_error=True)
 
                     # Interpolate the value at time t
                     interpolated_values[i, j] = interpolator(modified_time)
@@ -179,7 +182,7 @@ class DeformationMap(pet.component):
                     time_series = north_cube[i, j, :]
 
                     # Create the interpolator function
-                    interpolator = interp1d(times, time_series, kind='linear', bounds_error=True)
+                    interpolator = interp1d(x=times, y=time_series, kind='linear', bounds_error=True)
 
                     # Interpolate the value at time t
                     interpolated_values[i, j] = interpolator(modified_time)
@@ -198,7 +201,7 @@ class DeformationMap(pet.component):
                     time_series = up_cube[i, j, :]
 
                     # Create the interpolator function
-                    interpolator = interp1d(times, time_series, kind='linear', bounds_error=True)
+                    interpolator = interp1d(x=times, y=time_series, kind='linear', bounds_error=True)
 
                     # Interpolate the value at time t
                     interpolated_values[i, j] = interpolator(modified_time)
@@ -216,10 +219,10 @@ class DeformationMap(pet.component):
         plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25, label="[m]")
 
         # Add labels and legend
-        ax.set_title('Displacements ' + direction, pad=20)
+        plt.title('Displacements ' + direction, pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/displacements_' + direction + '_' + str(modified_time) +
-                    '.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/displacements_' + str(self.pyre_name) + '_' +
+                          direction + '_' + str(modified_time) + '.png', format='png', dpi=500)
 
 # end of file

@@ -4,6 +4,7 @@
 #
 # the pet development team
 # (c) 2023-2024 all rights reserved
+
 import numpy as np
 import pet
 import pandas as pd
@@ -29,10 +30,5 @@ class ChirpChirp(pet.component, family="pet.instruments.chirpchirp", implements=
         self.bw = np.degrees(bw)
         self.start_look_angle = look_angle - self.bw
         self.end_look_angle = look_angle + self.bw
-
-    def get_noise(self):
-        """
-
-        """
 
 # end of file

@@ -28,19 +28,20 @@ conops = pet.conOps.nightingale5to1(name="nightingale",
 # Get the times defining the first five tracks
 times = conops.get_five_tracks()
 
-# Get the orbit cycle time of the instrument
-orbit_cycle_time = conops.orbit_cycle
+track = pet.operations.track(start_time=times[0], end_time=times[1], planet=planet,
+                             conops=conops, instrument=instrument, temporal_resolution=20, spatial_resolution=2000)
 
-track = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, conops=conops, instrument=instrument,
-                          temporal_resolution=20, spatial_resolution=2000)
-track.calculate_ground_swath()
-track.save()
+# Calculate the positions
+# track.calculate_ground_swath()
 
-# track.load()
+# Save the track
+# track.save()
+
+track.load()
 
 # Define a projection
-projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-40,
-                                           folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
+projection = pet.projections.biaxialCylindrical(
+    name="biaxial cylindrical", folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
 
 # Plot the track
 fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
