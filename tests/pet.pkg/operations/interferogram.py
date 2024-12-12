@@ -32,10 +32,10 @@ times = conops.get_five_tracks()
 orbit_cycle_time = conops.orbit_cycle
 
 # Make a displacement map
-deformation_map = pet.geophysical.deformationMap(name="het",
+deformation_map = pet.geophysical.deformationMap(name="base",
                                                  displacement_data_path=
                                                  "/home/user/Documents/GitHub/"
-                                                 "Planetary-Exploration-Tool/input/Simulation_Het_Results.hdf5",
+                                                 "Planetary-Exploration-Tool/input/Simulation_Base_Results.hdf5",
                                                  planet=planet)
 
 track1 = pet.operations.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
@@ -57,12 +57,12 @@ interferogram = pet.operations.interferogram(instrument=instrument, planet=plane
                                              track1=track1, track2=track2, conops=conops, baseline=10)
 
 # Calculate interferogram
-interferogram.calculate_igram()
+# interferogram.calculate_igram()
 
 # Save interferogram
 # interferogram.save()
 
-# # Load the interferogram
+# # # Load the interferogram
 interferogram.load()
 
 # Define a projection

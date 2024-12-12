@@ -91,7 +91,6 @@ class TimeSeries(pet.component):
         zs = []
 
         for i in range(len(spatial_points)):
-
             # Set a small regularization parameter, equivalent to Cm
             lambda_reg = 1e-5
 
@@ -111,6 +110,12 @@ class TimeSeries(pet.component):
         return amplitudes, phis, zs
 
     def create_3d_time_series(self, interferograms, spatial_points):
+        """
+        Return the amplitudes, phases, and topographic errors of a set of points in 3 or more look directions
+        :param interferograms: interferograms to analyze
+        :param spatial_points: points to do the inverse problem on
+        :return: amplitudes, phases, topographic errors
+        """
 
         # Set up a matrix of observations and a problem G matrix
         d_vectors = {i: [] for i in range(len(spatial_points))}  # List to collect rows for each point
@@ -119,6 +124,9 @@ class TimeSeries(pet.component):
         # Define the tidal cycle, and therefore the angular frequency
         tidal_cycle = self.planet.tidal_cycle
         omega = 2 * np.pi / tidal_cycle
+
+        # Create a conversion object
+        vector_conversions = pet.conversions.vectorConversions()
 
         # Iterate through the interferograms
         for interferogram in interferograms:
@@ -173,18 +181,22 @@ class TimeSeries(pet.component):
 
             # Construct the G matrix, passing through vector conversion to ENU
             [g_matrices[i].append([
-                *[arr.squeeze() for arr in self.cartesian_to_enu_vector(
-                    vectors_to_sat[0] * np.cos(omega * time2_interp[i]) - np.cos(omega * time1_interp[i]),
-                    vectors_to_sat[1] * np.cos(omega * time2_interp[i]) - np.cos(omega * time1_interp[i]),
-                    vectors_to_sat[2] * np.cos(omega * time2_interp[i]) - np.cos(omega * time1_interp[i]),
-                    [spatial_points[i, 0]], [spatial_points[i, 1]]
-                )],  # First 3 elements: vector0
-                *[arr.squeeze() for arr in self.cartesian_to_enu_vector(
-                    vectors_to_sat[0] * np.sin(omega * time2_interp[i]) - np.sin(omega * time1_interp[i]),
-                    vectors_to_sat[1] * np.sin(omega * time2_interp[i]) - np.sin(omega * time1_interp[i]),
-                    vectors_to_sat[2] * np.sin(omega * time2_interp[i]) - np.sin(omega * time1_interp[i]),
-                    [spatial_points[i, 0]], [spatial_points[i, 1]]
-                )],  # Next 3 elements: vector1
+                *[arr.squeeze() for arr
+                  in vector_conversions.cartesian_to_enu_vector(
+                        uvw_vectors=
+                        [vectors_to_sat[0] * np.cos(omega * time2_interp[i]) - np.cos(omega * time1_interp[i]),
+                         vectors_to_sat[1] * np.cos(omega * time2_interp[i]) - np.cos(omega * time1_interp[i]),
+                         vectors_to_sat[2] * np.cos(omega * time2_interp[i]) - np.cos(omega * time1_interp[i])],
+                        latitudes=[spatial_points[i, 0]], longitudes=[spatial_points[i, 1]]
+                    )],  # First 3 elements: vector0
+                *[arr.squeeze() for arr
+                  in vector_conversions.cartesian_to_enu_vector(
+                        uvw_vectors=
+                        [vectors_to_sat[0] * np.sin(omega * time2_interp[i]) - np.sin(omega * time1_interp[i]),
+                         vectors_to_sat[1] * np.sin(omega * time2_interp[i]) - np.sin(omega * time1_interp[i]),
+                         vectors_to_sat[2] * np.sin(omega * time2_interp[i]) - np.sin(omega * time1_interp[i])],
+                        latitudes=[spatial_points[i, 0]], longitudes=[spatial_points[i, 1]]
+                    )],  # Next 3 elements: vector1
                 psis_interp[i],  # Final element
             ]
             ) for i in range(len(spatial_points))]
