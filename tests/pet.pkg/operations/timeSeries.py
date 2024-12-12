@@ -38,18 +38,19 @@ deformation_map = pet.geophysical.deformationMap(name="het",
                                                  "Planetary-Exploration-Tool/input/Simulation_Het_Results.hdf5",
                                                  planet=planet)
 
+# Make a bunch of interferograms
 interferograms = []
 
-track1 = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track1 = pet.operations.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track1.load()
 
 start_time = track1.start_time
 end_time = track1.end_time
 times_values = track1.data["time"].values
 
-track2 = pet.mission.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track2 = pet.operations.track(start_time=times[0], end_time=times[1], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track2.load()
 
 for i in range(10):
@@ -67,16 +68,16 @@ for i in range(10):
     interferogram.load()
     interferograms.append(interferogram)
 
-track1 = pet.mission.track(start_time=times[1], end_time=times[2], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track1 = pet.operations.track(start_time=times[1], end_time=times[2], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track1.load()
 
 start_time = track1.start_time
 end_time = track1.end_time
 times_values = track1.data["time"].values
 
-track2 = pet.mission.track(start_time=times[1], end_time=times[2], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track2 = pet.operations.track(start_time=times[1], end_time=times[2], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track2.load()
 
 for i in range(10):
@@ -93,16 +94,16 @@ for i in range(10):
     interferogram.load()
     interferograms.append(interferogram)
 
-track1 = pet.mission.track(start_time=times[2], end_time=times[3], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track1 = pet.operations.track(start_time=times[2], end_time=times[3], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track1.load()
 
 start_time = track1.start_time
 end_time = track1.end_time
 times_values = track1.data["time"].values
 
-track2 = pet.mission.track(start_time=times[2], end_time=times[3], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track2 = pet.operations.track(start_time=times[2], end_time=times[3], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track2.load()
 
 for i in range(10):
@@ -119,16 +120,16 @@ for i in range(10):
     interferogram.load()
     interferograms.append(interferogram)
 
-track1 = pet.mission.track(start_time=times[3], end_time=times[4], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track1 = pet.operations.track(start_time=times[3], end_time=times[4], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track1.load()
 
 start_time = track1.start_time
 end_time = track1.end_time
 times_values = track1.data["time"].values
 
-track2 = pet.mission.track(start_time=times[3], end_time=times[4], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track2 = pet.operations.track(start_time=times[3], end_time=times[4], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track2.load()
 
 for i in range(10):
@@ -145,16 +146,16 @@ for i in range(10):
     interferogram.load()
     interferograms.append(interferogram)
 
-track1 = pet.mission.track(start_time=times[4], end_time=times[5], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track1 = pet.operations.track(start_time=times[4], end_time=times[5], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track1.load()
 
 start_time = track1.start_time
 end_time = track1.end_time
 times_values = track1.data["time"].values
 
-track2 = pet.mission.track(start_time=times[4], end_time=times[5], planet=planet, instrument=instrument,
-                           conops=conops, temporal_resolution=20, spatial_resolution=2000)
+track2 = pet.operations.track(start_time=times[4], end_time=times[5], planet=planet, instrument=instrument,
+                              conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track2.load()
 
 for i in range(10):
@@ -171,7 +172,10 @@ for i in range(10):
     interferogram.load()
     interferograms.append(interferogram)
 
+# Make a time series object
 time_series = pet.operations.timeSeries(planet=planet, conops=conops)
+
+# Read the amplitudes, phases, and topographical errors
 amplitudes, phases, zs = time_series.create_3d_time_series(
     interferograms=interferograms, spatial_points=np.asarray([[-88, 2.0]]))
 
