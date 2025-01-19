@@ -69,6 +69,7 @@ class Track:
             data=look_angles,
             dims=["points"],
             coords={
+                "sat_pos_time": ("points", times),
                 "time": ("points", times),
                 "x": ("points", np.asarray([point[0] for point in cartesian_coordinates])),
                 "y": ("points", np.asarray([point[1] for point in cartesian_coordinates])),

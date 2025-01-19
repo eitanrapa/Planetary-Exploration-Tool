@@ -57,26 +57,26 @@ interferogram = pet.operations.interferogram(instrument=instrument, planet=plane
                                              track1=track1, track2=track2, conops=conops, baseline=10)
 
 # Calculate interferogram
-# interferogram.calculate_igram()
+interferogram.calculate_igram()
 
 # Save interferogram
 # interferogram.save()
 
-# # # Load the interferogram
-interferogram.load()
+# Load the interferogram
+# interferogram.load()
 
-# Define a projection
-projection = pet.projections.biaxialCylindrical(name="biaxial cylindrical",
-                                                folder_path=
-                                                "/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
-
-# Plot interferogram
-fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
-interferogram.visualize_interferogram(projection=projection, fig=fig, globe=globe, ax=ax)
-
-# Plot the displacements
-fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
-interferogram.visualize_displacements(projection=projection, fig=fig, globe=globe, ax=ax)
+# # Define a projection
+# projection = pet.projections.biaxialCylindrical(name="biaxial cylindrical",
+#                                                 folder_path=
+#                                                 "/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
+#
+# # Plot interferogram
+# fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
+# interferogram.visualize_interferogram(projection=projection, fig=fig, globe=globe, ax=ax)
+#
+# # Plot the displacements
+# fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
+# interferogram.visualize_displacements(projection=projection, fig=fig, globe=globe, ax=ax)
 
 fm.clear()
 

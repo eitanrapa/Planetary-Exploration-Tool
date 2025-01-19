@@ -69,6 +69,7 @@ class Interferogram(pet.component):
             data=los_displacements,
             dims=["points"],
             coords={
+                "sat_pos_time": ("points", self.track1.data["sat_pos_time"].values),
                 "time1": ("points", self.track1.data["time"].values),
                 "time2": ("points", self.track2.data["time"].values),
                 "psi": ("points", psis),
@@ -173,12 +174,12 @@ class Interferogram(pet.component):
         positions = np.asarray([x, y, z]).T
 
         # Get satellite positions and velocities
-        satellite_positions, sat_velocities = self.conOps.get_states(times=self.track1.data["time"].values)
+        satellite_positions, sat_velocities = self.conOps.get_states(times=self.track1.data["sat_pos_time"].values)
 
         flattened_points = self.get_flattened_positions(positions=positions, satellite_position=satellite_positions)
 
         # Get flattened angles for the satellite positions and ground points
-        angles = self.get_flattened_angles(time=self.track1.data["time"].values,
+        angles = self.get_flattened_angles(time=self.track1.data["sat_pos_time"].values,
                                            satellite_position=satellite_positions, flat_positions=flattened_points)
 
         # Get the distances from the flattened points to the satellites
