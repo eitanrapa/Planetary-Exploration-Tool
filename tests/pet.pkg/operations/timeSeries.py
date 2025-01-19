@@ -32,10 +32,10 @@ times = conops.get_five_tracks()
 orbit_cycle_time = conops.orbit_cycle
 
 # Make a displacement map
-deformation_map = pet.geophysical.deformationMap(name="het",
+deformation_map = pet.geophysical.deformationMap(name="base",
                                                  displacement_data_path=
                                                  "/home/user/Documents/GitHub/"
-                                                 "Planetary-Exploration-Tool/input/Simulation_Het_Results.hdf5",
+                                                 "Planetary-Exploration-Tool/input/Simulation_Base_Results.hdf5",
                                                  planet=planet)
 
 # Make a bunch of interferograms
@@ -65,6 +65,8 @@ for i in range(10):
     interferogram = pet.operations.interferogram(instrument=instrument, planet=planet,
                                                  deformation_map=deformation_map,
                                                  track1=track1, track2=track2, conops=conops, baseline=10)
+    # interferogram.calculate_igram()
+    # interferogram.save()
     interferogram.load()
     interferograms.append(interferogram)
 
@@ -91,6 +93,8 @@ for i in range(10):
 
     interferogram = pet.operations.interferogram(instrument=instrument, planet=planet, deformation_map=deformation_map,
                                                  track1=track1, track2=track2, conops=conops, baseline=10)
+    # interferogram.calculate_igram()
+    # interferogram.save()
     interferogram.load()
     interferograms.append(interferogram)
 
@@ -117,6 +121,8 @@ for i in range(10):
 
     interferogram = pet.operations.interferogram(instrument=instrument, planet=planet, deformation_map=deformation_map,
                                                  track1=track1, track2=track2, conops=conops, baseline=10)
+    # interferogram.calculate_igram()
+    # interferogram.save()
     interferogram.load()
     interferograms.append(interferogram)
 
@@ -143,6 +149,8 @@ for i in range(10):
 
     interferogram = pet.operations.interferogram(instrument=instrument, planet=planet, deformation_map=deformation_map,
                                                  track1=track1, track2=track2, conops=conops, baseline=10)
+    # interferogram.calculate_igram()
+    # interferogram.save()
     interferogram.load()
     interferograms.append(interferogram)
 
@@ -169,6 +177,8 @@ for i in range(10):
 
     interferogram = pet.operations.interferogram(instrument=instrument, planet=planet, deformation_map=deformation_map,
                                                  track1=track1, track2=track2, conops=conops, baseline=10)
+    # interferogram.calculate_igram()
+    # interferogram.save()
     interferogram.load()
     interferograms.append(interferogram)
 

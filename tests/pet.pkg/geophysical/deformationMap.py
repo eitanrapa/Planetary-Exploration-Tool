@@ -18,10 +18,10 @@ fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tp
 planet = pet.planets.enceladus(name="enceladus")
 
 # Make a displacement map
-deformation_map = pet.geophysical.deformationMap(name="het",
+deformation_map = pet.geophysical.deformationMap(name="base",
                                                  displacement_data_path=
                                                  "/home/user/Documents/GitHub/Planetary-Exploration-Tool/"
-                                                 "input/Simulation_Het_Results.hdf5",
+                                                 "input/Simulation_Base_Results.hdf5",
                                                  planet=planet)
 # Make a con ops
 conops = pet.conOps.nightingale5to1(name="nightingale",
@@ -32,13 +32,22 @@ projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitu
                                            folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
 
 # Visualize displacements
-deformation_map.visualize(projection=projection, time_point=0, direction="east")
+deformation_map.visualize(projection=projection, time_point=1482224658.317582, direction="east")
 
 # Visualize displacements
-deformation_map.visualize(projection=projection, time_point=0, direction="north")
+deformation_map.visualize(projection=projection, time_point=1482224658.317582, direction="north")
 
 # Visualize displacements
-deformation_map.visualize(projection=projection, time_point=0 , direction="up")
+deformation_map.visualize(projection=projection, time_point=1482224658.317582, direction="up")
+
+# Visualize displacements
+deformation_map.visualize(projection=projection, time_point=1482334678.317582, direction="east")
+
+# Visualize displacements
+deformation_map.visualize(projection=projection, time_point=1482334678.317582, direction="north")
+
+# Visualize displacements
+deformation_map.visualize(projection=projection, time_point=1482334678.317582, direction="up")
 
 # # Visualize displacements
 # displacements.visualize(projection=projection, time_point=1482219658.317582 + 110020, direction="east")

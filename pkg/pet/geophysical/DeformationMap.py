@@ -25,35 +25,6 @@ class DeformationMap(pet.component):
         self.displacement_data_path = pathlib.PosixPath(displacement_data_path)
         self.planet = planet
 
-        def enu_to_cartesian_cubes(self, east_cube, north_cube, up_cube, latitudes, longitudes):
-            """
-            Function that converts between local east, north, up vectors and ellipsoidal center x, y, z vectors.
-            Also needs local coordinates.
-            :param east_cube: local east pointing cube
-            :param north_cube: local north pointing cube
-            :param up_cube: local up pointing cube
-            :param latitudes: local latitude of points
-            :param longitudes: local longitude of points
-            :return: u, v, w vector
-            """
-
-            # Convert longitude and latitude to radians
-            longitude = np.deg2rad(longitudes)
-            latitude = np.deg2rad(latitudes)
-
-            # Reshape longitudes and latitudes for broadcasting
-            longitude = longitude[:, np.newaxis, np.newaxis]
-            latitude = latitude[np.newaxis, :, np.newaxis]
-
-            # Calculate vector transformation
-            t = np.cos(latitude) * up_cube - np.sin(latitude) * north_cube
-            w = np.sin(latitude) * up_cube + np.cos(latitude) * north_cube
-            u = np.cos(longitude) * t - np.sin(longitude) * east_cube
-            v = np.sin(longitude) * t + np.cos(longitude) * east_cube
-
-            # Return the vector
-            return np.asarray([u, v, w])
-
     def read_displacements(self):
         """
         Returns the latitudes, longitudes, times, and cycle time of the data cubes representing the surface displacement
