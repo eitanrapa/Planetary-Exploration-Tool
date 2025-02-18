@@ -4,15 +4,19 @@
 #
 # the pet development team
 # (c) 2023-2024 all rights reserved
+
 import pet
 import numpy as np
+from matplotlib import pyplot as plt
+import cartopy.crs as ccrs
 from scipy.interpolate import griddata
 from tqdm import tqdm
 import alphashape
 from shapely.geometry import Point
 import xarray as xr
 
-class TimeSeries_3D(pet.component):
+
+class TimeSeries3D(pet.component):
     """
     Class that is able to create time series information from loaded interferograms
     """
@@ -25,7 +29,7 @@ class TimeSeries_3D(pet.component):
         self.data = []
 
     @classmethod
-    def load_from_file(cls, planet, conops, instrument, filename):
+    def from_file(cls, planet, conops, instrument, filename):
         """
 
         """
@@ -55,11 +59,10 @@ class TimeSeries_3D(pet.component):
         # Open HDF5 file
         self.data.to_netcdf(file_name)
 
-    def create_data_array(self, cartesian_coordinates, geodetic_coordinates, amplitudes, amplitude_uncertainties,
+    def create_data_array(self, geodetic_coordinates, amplitudes, amplitude_uncertainties,
                           phases, phase_uncertainties, topography_corrections):
         """
         Create a xarray with the input data
-        :param cartesian_coordinates: x, y, z coordinates to be saved
         :param geodetic_coordinates: lat, long, height coordinates to be saved
         :param amplitudes: amplitudes to be saved
         :param amplitude_uncertainties: amplitude uncertainties to be saved
@@ -77,12 +80,8 @@ class TimeSeries_3D(pet.component):
                 "phases": ("points", np.asarray(phases)),
                 "phase_uncertainties": ("points", np.asarray(phase_uncertainties)),
                 "topography_corrections": ("points", np.asarray(topography_corrections)),
-                "x": ("points", np.asarray([point[0] for point in cartesian_coordinates])),
-                "y": ("points", np.asarray([point[1] for point in cartesian_coordinates])),
-                "z": ("points", np.asarray([point[2] for point in cartesian_coordinates])),
                 "latitude": ("points", np.asarray([point[0] for point in geodetic_coordinates])),
-                "longitude": ("points", np.asarray([point[1] for point in geodetic_coordinates])),
-                "height": ("points", np.asarray([point[2] for point in geodetic_coordinates]))},
+                "longitude": ("points", np.asarray([point[1] for point in geodetic_coordinates]))},
             name="amplitudes",
             attrs=dict(
                 body_id=self.conOps.body_id,
@@ -99,7 +98,7 @@ class TimeSeries_3D(pet.component):
         sigma_a = np.sqrt((uncertainty_c * np.sin(phase) ** 2 - uncertainty_s * np.cos(phase) ** 2) /
                           (np.sin(phase) ** 4 - np.cos(phase) ** 4))
         sigma_phase = np.sqrt((-uncertainty_c * np.cos(phase) ** 2 + uncertainty_s * np.sin(phase) ** 2) /
-                            (a**2*(np.sin(phase) ** 4 - np.cos(phase) ** 4)))
+                              (a ** 2 * (np.sin(phase) ** 4 - np.cos(phase) ** 4)))
         return sigma_a, sigma_phase
 
     def create_3d_time_series(self, interferograms, spatial_points):
@@ -127,11 +126,11 @@ class TimeSeries_3D(pet.component):
         for interferogram in tqdm(interferograms):
 
             # Load the data
-            dataarray = interferogram.data
+            data_array = interferogram.data
 
             # Extract data
-            latitudes = dataarray["latitude"].values
-            longitudes = dataarray["longitude"].values
+            latitudes = data_array["latitude"].values
+            longitudes = data_array["longitude"].values
             points = np.column_stack((latitudes, longitudes))
 
             # Interpolate each desired variable
@@ -139,7 +138,7 @@ class TimeSeries_3D(pet.component):
 
             # Interpolate each desired variable
             for var in ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]:
-                values = dataarray[var].values
+                values = data_array[var].values
                 interpolated_value = griddata(points=points, values=values, xi=spatial_points, method="cubic")
                 results[var].extend(interpolated_value)
 
@@ -264,27 +263,95 @@ class TimeSeries_3D(pet.component):
                 calculated_amplitudes = [a1, a2, a3]
                 calculated_phases = [phase1, phase2, phase3]
                 uncertainty_a1, uncertainty_phase1 = self.calculate_uncertainty(uncertainty_c=main_diagonal[0],
-                                                                              uncertainty_s=main_diagonal[1],
-                                                                              a=a1, phase=phase1)
+                                                                                uncertainty_s=main_diagonal[1],
+                                                                                a=a1, phase=phase1)
                 uncertainty_a2, uncertainty_phase2 = self.calculate_uncertainty(uncertainty_c=main_diagonal[2],
-                                                                              uncertainty_s=main_diagonal[3],
-                                                                              a=a2, phase=phase2)
+                                                                                uncertainty_s=main_diagonal[3],
+                                                                                a=a2, phase=phase2)
                 uncertainty_a3, uncertainty_phase3 = self.calculate_uncertainty(uncertainty_c=main_diagonal[4],
-                                                                              uncertainty_s=main_diagonal[5],
-                                                                              a=a3, phase=phase3)
+                                                                                uncertainty_s=main_diagonal[5],
+                                                                                a=a3, phase=phase3)
                 amplitudes.append(calculated_amplitudes)
                 phases.append(calculated_phases)
                 amplitude_uncertainties.append([uncertainty_a1, uncertainty_a2, uncertainty_a3])
                 phase_uncertainties.append([uncertainty_phase1, uncertainty_phase2, uncertainty_phase3])
                 topography_corrections.append(z)
 
-        # Return the results
-        return amplitudes, amplitude_uncertainties, phases, phase_uncertainties, topography_corrections
+        self.create_data_array(geodetic_coordinates=spatial_points, amplitudes=amplitudes,
+                               amplitude_uncertainties=amplitude_uncertainties, phases=phases,
+                               phase_uncertainties=phase_uncertainties, topography_corrections=topography_corrections)
 
-    def create_3d_time_series_from_1D(self, time_series):
+    def create_3d_time_series_from_1d(self, time_series):
         """
 
         """
 
+    def visualize_time_series_amplitudes(self, projection, fig=None, globe=None, ax=None, return_fig=False):
+        """
+
+        """
+
+        if fig is None:
+            # Get the projection
+            fig, ax, globe = projection.proj(planet=self.planet)
+
+        # Load the values to plot
+        amplitudes = self.data.values
+        longitudes = self.data["longitude"].values
+        latitudes = self.data["latitude"].values
+
+        # Make the colormap cyclical
+        cm = plt.cm.get_cmap('hsv')
+
+        # Plot the amplitudes
+        im = ax.scatter(longitudes, latitudes, c=amplitudes, cmap=cm, transform=ccrs.PlateCarree(globe=globe))
+
+        # return fig, ax, globe if necessary
+        if return_fig:
+            return fig, ax, globe
+
+        # Add a colorbar
+        plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25)
+
+        # Add labels and legend
+        plt.title('Displacement amplitudes', pad=20)
+
+        # Save the plot
+        plt.savefig(fname=projection.folder_path + '/' + 'time_series_amplitudes_' +
+                    self.deformation_map.pyre_name + '_' + str(self.conOps.body_id) + '.png', format='png', dpi=500)
+
+    def visualize_time_series_phases(self, projection, fig=None, globe=None, ax=None, return_fig=False):
+        """
+
+        """
+
+        if fig is None:
+            # Get the projection
+            fig, ax, globe = projection.proj(planet=self.planet)
+
+        # Load the values to plot
+        phases = self.data["phases"].values
+        longitudes = self.data["longitude"].values
+        latitudes = self.data["latitude"].values
+
+        # Make the colormap cyclical
+        cm = plt.cm.get_cmap('hsv')
+
+        # Plot the amplitudes
+        im = ax.scatter(longitudes, latitudes, c=phases, cmap=cm, transform=ccrs.PlateCarree(globe=globe))
+
+        # return fig, ax, globe if necessary
+        if return_fig:
+            return fig, ax, globe
+
+        # Add a colorbar
+        plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25)
+
+        # Add labels and legend
+        plt.title('Displacement phases', pad=20)
+
+        # Save the plot
+        plt.savefig(fname=projection.folder_path + '/' + 'time_series_phases_' +
+                    self.deformation_map.pyre_name + '_' + str(self.conOps.body_id) + '.png', format='png', dpi=500)
 
 # end of file

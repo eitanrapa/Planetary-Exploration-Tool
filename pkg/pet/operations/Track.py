@@ -7,7 +7,6 @@
 
 import cartopy.crs as ccrs
 import cspyce as spice
-import git
 import matplotlib.pyplot as plt
 import numpy as np
 import pet
@@ -32,28 +31,50 @@ class Track:
         self.spatial_resolution = spatial_resolution
         self.data = None
 
-    def save(self):
+    @classmethod
+    def from_file(cls, planet, conops, instrument, filename):
+        """
+
+        """
+
+        # Open the HDF5 file in read mode
+        data = xr.open_dataset(filename_or_obj=filename)
+
+        obj = cls(start_time=data.attrs["start_time"], end_time=data.attrs["end_time"], planet=planet, conops=conops,
+                  instrument=instrument, temporal_resolution=data.attrs["temporal_resolution"],
+                  spatial_resolution=data.attrs["spatial_resolution"])
+        obj.data = data  # Restore computed result
+        return obj
+
+    @classmethod
+    def from_data_array(cls, planet, conops, instrument, data):
+        """
+
+        """
+
+        obj = cls(start_time=data.attrs["start_time"], end_time=data.attrs["end_time"], planet=planet, conops=conops,
+                  instrument=instrument, temporal_resolution=data.attrs["temporal_resolution"],
+                  spatial_resolution=data.attrs["spatial_resolution"])
+        obj.data = data  # Restore computed result
+        return obj
+
+    @classmethod
+    def from_files(cls, planet, conops, instrument, file_list):
+        """
+
+        """
+
+        # Load all the files
+        return [cls.from_file(planet=planet, conops=conops, instrument=instrument, filename=file) for file in file_list]
+
+    def save(self, file_name):
         """
         Save the track to an HDF5 file
         :return: Nothing returned
         """
 
         # Open HDF5 file
-        repo = git.Repo('../operations', search_parent_directories=True)
-        self.data.to_netcdf(repo.working_tree_dir + '/files/track_' + str(self.conOps.body_id) + '_'
-                            + str(self.start_time) + '_' + str(self.end_time) + ".nc")
-
-    def load(self):
-        """
-        Load a hdf5 file containing a previous track object
-        :return: Nothing returned
-        """
-
-        # Open the HDF5 file in read mode
-        repo = git.Repo('../operations', search_parent_directories=True)
-        data = xr.open_dataset(repo.working_tree_dir + '/files/track_' + str(self.conOps.body_id) + '_'
-                               + str(self.start_time) + '_' + str(self.end_time) + ".nc")
-        self.data = data
+        self.data.to_netcdf(file_name)
 
     def create_data_array(self, cartesian_coordinates, geodetic_coordinates, look_angles, times):
         """
@@ -81,7 +102,9 @@ class Track:
             attrs=dict(
                 body_id=self.conOps.body_id,
                 start_time=self.start_time,
-                end_time=self.end_time
+                end_time=self.end_time,
+                temporal_resolution=self.temporal_resolution,
+                spatial_resolution=self.spatial_resolution
             ),
         )
 
