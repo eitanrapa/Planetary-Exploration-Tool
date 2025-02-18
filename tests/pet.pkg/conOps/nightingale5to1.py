@@ -28,15 +28,23 @@ projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitu
 # Create a time conversion instance
 time_conversion = pet.spicetoolkit.timeConversion()
 
-utc = "2046 DEC 20 15:10:40.134"
+times = conops.get_five_tracks()
 
-et = time_conversion.convert_ets(utcs=utc)
+# convert to utcs
+utcs = time_conversion.convert_utcs(ets=times)
 
-position, velocity = conops.get_states(times=et)
+# Plot the orbits
+conops.plot_orbit(start_time=utcs[0], end_time=utcs[5], projection=projection)
 
-# Plot the orbit
-conops.plot_orbit(start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 22 03:10:40.134",
-                  projection=projection)
+# utc = "2046 DEC 20 15:10:40.134"
+#
+# et = time_conversion.convert_ets(utcs=utc)
+#
+# position, velocity = conops.get_states(times=et)
+#
+# # Plot the orbit
+# conops.plot_orbit(start_time="2046 DEC 20 15:10:40.134", end_time="2046 DEC 22 03:10:40.134",
+#                   projection=projection)
 
 fm.clear()
 

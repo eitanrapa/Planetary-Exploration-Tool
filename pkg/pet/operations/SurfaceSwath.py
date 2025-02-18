@@ -169,7 +169,7 @@ class Track:
 
                 # Check if the look angle and relative position is correct
                 if ((self.instrument.start_look_angle < look_angles[i][j] < self.instrument.end_look_angle)
-                        and (relative_positions[i][j] == "right") and limb_checks[i][j] == 0):
+                        and (relative_positions[i][j] == self.instrument.look_direction) and limb_checks[i][j] == 0):
                     # Append the groundTarget to azimuthal beam
                     indices.append(j)
 

@@ -21,6 +21,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     body_id = "602"
     reference_id = "IAU_ENCELADUS"
     tidal_cycle = 118386.8352
+    topography_uncertainty = 300  # [m]
 
     @pet.export
     def get_axes(self):
