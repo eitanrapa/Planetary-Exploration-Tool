@@ -7,55 +7,67 @@
 
 import pet
 import xarray as xr
-import git
 import cspyce as spice
 import numpy as np
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 
 
-class Interferogram(pet.component):
+class SimpleInterferogram(pet.component):
     """
     Class that creates a single interferogram between two points of a displacement map given an instrument orbit
     """
 
-    def __init__(self, planet, instrument, deformation_map, conops, track1, track2, baseline, **kwargs):
+    def __init__(self, planet, instrument, conops, deformation_map, track1, track2, baseline, **kwargs):
         super().__init__(**kwargs)
         self.planet = planet
         self.instrument = instrument
-        self.conOps = conops
+        self.conops = conops
         self.deformation_map = deformation_map
         self.track1 = track1
         self.track2 = track2
         self.baseline = baseline
         self.data = None
 
-    def save(self):
+    @classmethod
+    def from_file(cls, planet, instrument, conops, deformation_map, filename):
         """
-        Save the interferogram to an HDF5 file
+
+        """
+
+        # Open the HDF5 file in read mode
+        dataset = xr.open_dataset(filename)
+        track1_da = dataset["track1"]
+        track2_da = dataset["track2"]
+        data = dataset["los_displacements"]
+
+        track1 = pet.Track.from_data_array(planet=planet, conops=conops, instrument=instrument, filename=track1_da)
+        track2 = pet.Track.from_data_array(planet=planet, conops=conops, instrument=instrument, filename=track2_da)
+
+        obj = cls(planet=planet, instrument=instrument, conops=conops, deformation_map=deformation_map, track1=track1,
+                  track2=track2, baseline=data.attrs["baseline"])
+        obj.data = data  # Restore computed result
+
+        return obj
+
+    @classmethod
+    def from_files(cls, planet, instrument, conops, deformation_map, file_list):
+        """
+
+        """
+
+        # Load all the files
+        return [cls.from_file(planet=planet, instrument=instrument, conops=conops, deformation_map=deformation_map,
+                              filename=file) for file in file_list]
+
+    def save(self, file_name):
+        """
+        Save the track to an HDF5 file
         :return: Nothing returned
         """
 
         # Open HDF5 file
-        repo = git.Repo('.', search_parent_directories=True)
-        self.data.to_netcdf(repo.working_tree_dir + '/files/igram_' + self.deformation_map.pyre_name + '_' +
-                            str(self.conOps.body_id) + '_' + str(self.track1.start_time) + '_' +
-                            str(self.track1.end_time) + '_' + str(self.track2.start_time) + '_' +
-                            str(self.track2.end_time) + ".nc")
-
-    def load(self):
-        """
-        Load a hdf5 file containing a previous SimpleInterferogram object
-        :return: Nothing returned
-        """
-
-        # Open the HDF5 file in read mode
-        repo = git.Repo('.', search_parent_directories=True)
-        data = xr.open_dataset(repo.working_tree_dir + '/files/igram_' + self.deformation_map.pyre_name + '_' +
-                               str(self.conOps.body_id) + '_' + str(self.track1.start_time) + '_' +
-                               str(self.track1.end_time) + '_' + str(self.track2.start_time) + '_' +
-                               str(self.track2.end_time) + ".nc")
-        self.data = data
+        self.data.to_netcdf(file_name)
 
     def create_data_array(self, los_displacements, psis):
         """
@@ -64,7 +76,7 @@ class Interferogram(pet.component):
         :param psis: Flattened values
         """
 
-        # Create the xarray Dataset
+        # Create the xarray datarray
         los_displacements_da = xr.DataArray(
             data=los_displacements,
             dims=["points"],
@@ -81,15 +93,26 @@ class Interferogram(pet.component):
                 "height": ("points", self.track1.data["height"].values)},
             name="los_displacements",
             attrs=dict(
-                body_id=self.conOps.body_id,
+                deformation_map=self.deformation_map.pyre_name,
+                body_id=self.conops.body_id,
+                baseline=self.baseline,
                 start_time1=self.track1.start_time,
                 end_time1=self.track1.end_time,
-                start_time2=self.track1.start_time,
+                start_time2=self.track2.start_time,
                 end_time2=self.track2.end_time,
             ),
         )
 
-        self.data = los_displacements_da
+        # Save the datarray along with track1 and track2 data arrays to a dataset
+        ds = xr.Dataset(
+            data_vars=dict(
+                los_displacements=los_displacements_da,
+                track1=self.track1.data,
+                track2=self.track2.data
+            )
+        )
+
+        self.data = ds
 
     def get_flattened_angles(self, time, satellite_position, flat_positions):
         """
@@ -101,7 +124,7 @@ class Interferogram(pet.component):
         """
 
         # Calculate the satellite intersect and height with the shape
-        intersects, satellite_heights = self.planet.get_sub_obs_points(times=time, conops=self.conOps)
+        intersects, satellite_heights = self.planet.get_sub_obs_points(times=time, conops=self.conops)
 
         # Calculate the distance between center and satellite intersects
         satellite_radii = np.asarray([np.linalg.norm(intersect - [0, 0, 0]) for intersect in intersects])
@@ -174,7 +197,7 @@ class Interferogram(pet.component):
         positions = np.asarray([x, y, z]).T
 
         # Get satellite positions and velocities
-        satellite_positions, sat_velocities = self.conOps.get_states(times=self.track1.data["sat_pos_time"].values)
+        satellite_positions, sat_velocities = self.conops.get_states(times=self.track1.data["sat_pos_time"].values)
 
         flattened_points = self.get_flattened_positions(positions=positions, satellite_position=satellite_positions)
 
@@ -266,7 +289,7 @@ class Interferogram(pet.component):
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/' + 'interferogram_' + self.deformation_map.pyre_name + '_' +
-                    str(self.conOps.body_id) + '_' + str(self.track1.start_time) + '_' + str(
+                    str(self.conops.body_id) + '_' + str(self.track1.start_time) + '_' + str(
                         self.track1.end_time) +
                     '_' + str(self.track2.start_time) + '_' + str(self.track2.end_time) + '.png', format='png',
                     dpi=500)
@@ -307,7 +330,7 @@ class Interferogram(pet.component):
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/' + 'displacements_' + self.deformation_map.pyre_name + '_' +
-                    str(self.conOps.body_id) + '_' + str(self.track1.start_time) + '_' + str(
+                    str(self.conops.body_id) + '_' + str(self.track1.start_time) + '_' + str(
                         self.track1.end_time) +
                     '_' + str(self.track2.start_time) + '_' + str(self.track2.end_time) + '.png', format='png',
                     dpi=500)

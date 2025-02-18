@@ -4,8 +4,11 @@
 #
 # the pet development team
 # (c) 2023-2024 all rights reserved
+
 import pet
 import numpy as np
+from matplotlib import pyplot as plt
+import cartopy.crs as ccrs
 from scipy.interpolate import griddata
 from tqdm import tqdm
 import alphashape
@@ -13,7 +16,7 @@ from shapely.geometry import Point
 import xarray as xr
 
 
-class TimeSeries_1D(pet.component):
+class TimeSeries1D(pet.component):
     """
     Class that is able to create time series information from loaded interferograms
     """
@@ -26,7 +29,7 @@ class TimeSeries_1D(pet.component):
         self.data = []
 
     @classmethod
-    def load_from_file(cls, planet, conops, instrument, filename):
+    def from_file(cls, planet, conops, instrument, filename):
         """
 
         """
@@ -125,11 +128,11 @@ class TimeSeries_1D(pet.component):
         for interferogram in interferograms:
 
             # Load the data
-            dataarray = interferogram.data
+            data_array = interferogram.data
 
             # Extract data
-            latitudes = dataarray["latitude"].values
-            longitudes = dataarray["longitude"].values
+            latitudes = data_array["latitude"].values
+            longitudes = data_array["longitude"].values
             points = np.column_stack((latitudes, longitudes))
 
             # Interpolate each desired variable
@@ -143,7 +146,7 @@ class TimeSeries_1D(pet.component):
 
                 # Interpolate each desired variable
                 for var in ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]:
-                    values = dataarray[var].values
+                    values = data_array[var].values
                     interpolated_value = griddata(points=points, values=values, xi=target_point, method="cubic")
                     results[var].extend(interpolated_value)
 
@@ -202,31 +205,104 @@ class TimeSeries_1D(pet.component):
 
         for i in tqdm(range(len(spatial_points))):
 
-            if len(line_of_sight_vectors) > 1:
-                raise Exception("More than 1 look direction is not supported in 1D inversions")
+            if len(line_of_sight_vectors[i]) < 1 or len(line_of_sight_vectors[i]) > 1:
+                amplitudes.append(np.nan)
+                amplitude_uncertainties.append(np.nan)
+                phases.append(np.nan)
+                phase_uncertainties.append(np.nan)
+                topography_corrections.append(np.nan)
 
-            # Do the inverse problem
-            m = np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_d) @ g_matrices[i] +
-                              np.eye(3)) @ (g_matrices[i].T @ np.linalg.inv(c_d) @ d_vectors[i])
+            else:
+                # Do the inverse problem
+                m = (np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_ds[i]) @ g_matrices[i])
+                     @ (g_matrices[i].T @ np.linalg.inv(c_ds[i]) @ d_vectors[i]))
 
-            # Retrieve the parameters
-            c, s, z = m
+                # Retrieve the parameters
+                c, s, z = m
 
-            # Calculate amplitudes and phases
-            covariance_matrix = np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_d) @ g_matrices[i] + np.eye(3))
-            a = np.sqrt(c ** 2 + s ** 2)
-            phase = np.arctan2(s, c)
-            main_diagonal = np.diag(covariance_matrix).tolist()
-            amplitudes.append(a)
-            phases.append(phase)
-            uncertainty_a1, uncertainty_phase1 = self.calculate_uncertainty(uncertainty_c=main_diagonal[0],
-                                                                            uncertainty_s=main_diagonal[1],
-                                                                            a=a, phase=phase)
-            amplitude_uncertainties.append(uncertainty_a1)
-            phase_uncertainties.append(uncertainty_phase1)
-            topography_corrections.append(z)
+                # Calculate amplitudes and phases
+                covariance_matrix = np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_ds) @ g_matrices[i])
+                a = np.sqrt(c ** 2 + s ** 2)
+                phase = np.arctan2(s, c)
+                main_diagonal = np.diag(covariance_matrix).tolist()
+                amplitudes.append(a)
+                phases.append(phase)
+                uncertainty_a1, uncertainty_phase1 = self.calculate_uncertainty(uncertainty_c=main_diagonal[0],
+                                                                                uncertainty_s=main_diagonal[1],
+                                                                                a=a, phase=phase)
+                amplitude_uncertainties.append(uncertainty_a1)
+                phase_uncertainties.append(uncertainty_phase1)
+                topography_corrections.append(z)
 
         # Return the results
         return amplitudes, amplitude_uncertainties, phases, phase_uncertainties, topography_corrections
+
+    def visualize_time_series_amplitudes(self, projection, fig=None, globe=None, ax=None, return_fig=False):
+        """
+
+        """
+
+        if fig is None:
+            # Get the projection
+            fig, ax, globe = projection.proj(planet=self.planet)
+
+        # Load the values to plot
+        amplitudes = self.data.values
+        longitudes = self.data["longitude"].values
+        latitudes = self.data["latitude"].values
+
+        # Make the colormap cyclical
+        cm = plt.cm.get_cmap('hsv')
+
+        # Plot the amplitudes
+        im = ax.scatter(longitudes, latitudes, c=amplitudes, cmap=cm, transform=ccrs.PlateCarree(globe=globe))
+
+        # return fig, ax, globe if necessary
+        if return_fig:
+            return fig, ax, globe
+
+        # Add a colorbar
+        plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25)
+
+        # Add labels and legend
+        plt.title('Displacement amplitudes', pad=20)
+
+        # Save the plot
+        plt.savefig(fname=projection.folder_path + '/' + 'time_series_amplitudes_' +
+                    self.deformation_map.pyre_name + '_' + str(self.conOps.body_id) + '.png', format='png', dpi=500)
+
+    def visualize_time_series_phases(self, projection, fig=None, globe=None, ax=None, return_fig=False):
+        """
+
+        """
+
+        if fig is None:
+            # Get the projection
+            fig, ax, globe = projection.proj(planet=self.planet)
+
+        # Load the values to plot
+        phases = self.data["phases"].values
+        longitudes = self.data["longitude"].values
+        latitudes = self.data["latitude"].values
+
+        # Make the colormap cyclical
+        cm = plt.cm.get_cmap('hsv')
+
+        # Plot the amplitudes
+        im = ax.scatter(longitudes, latitudes, c=phases, cmap=cm, transform=ccrs.PlateCarree(globe=globe))
+
+        # return fig, ax, globe if necessary
+        if return_fig:
+            return fig, ax, globe
+
+        # Add a colorbar
+        plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25)
+
+        # Add labels and legend
+        plt.title('Displacement phases', pad=20)
+
+        # Save the plot
+        plt.savefig(fname=projection.folder_path + '/' + 'time_series_phases_' +
+                    self.deformation_map.pyre_name + '_' + str(self.conOps.body_id) + '.png', format='png', dpi=500)
 
 # end of file

@@ -161,6 +161,7 @@ class Nightingale5to1(pet.component, family="pet.instruments.nightingale5to1", i
         plt.title('Orbit', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/nightingale_orbit.png', format='png', dpi=500)
+        plt.savefig(fname=projection.folder_path + '/nightingale_orbit_' + str(start_time) + '_' +
+                    str(end_time) + '.png', format='png', dpi=500)
 
 # end of file
