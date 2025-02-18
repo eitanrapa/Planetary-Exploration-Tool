@@ -30,5 +30,16 @@ class ChirpChirp(pet.component, family="pet.instruments.chirpchirp", implements=
         self.bw = np.degrees(bw)
         self.start_look_angle = look_angle - self.bw
         self.end_look_angle = look_angle + self.bw
+        self.look_direction = "right"
+
+    def get_instrument_noise(self, measured_los):
+        """
+        Some sample noise function
+        """
+
+        # Sample a gaussian with mean measured_los and std of 10 meters
+        noise = np.random.normal(loc=measured_los, scale=10, size=len(measured_los))
+
+        return noise
 
 # end of file

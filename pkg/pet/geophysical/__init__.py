@@ -5,6 +5,6 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from .DeformationMap import DeformationMap as deformationMap
+from .TidalDeformationMap import DeformationMap as deformationMap
 
 # end of file

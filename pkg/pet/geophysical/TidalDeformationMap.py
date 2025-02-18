@@ -12,6 +12,7 @@ import cartopy.crs as ccrs
 import pathlib
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import interp1d
+from scipy.optimize import curve_fit
 import numpy as np
 
 
@@ -98,6 +99,63 @@ class DeformationMap(pet.component):
         u_displacements, v_displacements, w_displacements = vector_interp((modified_longs, latitudes, modified_times)).T
 
         return u_displacements, v_displacements, w_displacements
+
+    def time_series(self, spatial_points, direction):
+
+        # Read the necessary data
+        colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
+
+        # Convert colatitudes to latitudes
+        latitudes = 90 - colatitudes
+
+        # Define the sine function
+        def sine_func(t, a, phi):
+            return a * np.sin((2 * np.pi) / self.planet.tidal_cycle * t + phi)
+
+        a_fits = []
+        phi_fits = []
+
+        if direction == "east":
+
+            # Interpolate the east cube
+            interpolator = RegularGridInterpolator(points=(longitudes, latitudes, times * self.planet.tidal_cycle),
+                                                   values=east_cube, method='linear', bounds_error=False,
+                                                   fill_value=None)
+        elif direction == "north":
+
+            # Interpolate the north cube
+            interpolator = RegularGridInterpolator(points=(longitudes, latitudes, times * self.planet.tidal_cycle),
+                                                   values=north_cube, method='linear', bounds_error=False,
+                                                   fill_value=None)
+        elif direction == "up":
+
+            # Interpolate the up cube
+            interpolator = RegularGridInterpolator(points=(longitudes, latitudes, times * self.planet.tidal_cycle),
+                                                   values=up_cube, method='linear', bounds_error=False,
+                                                   fill_value=None)
+
+        for point in spatial_points:
+
+            time_values = np.linspace(0, self.planet.tidal_cycle, len(times))
+
+            # Extract the time series for the spatial point, convert longitude to 0 - 360 forma
+            time_series = interpolator((point[1] % 360, point[0], time_values))
+
+            # Fit the sine function to the data
+            popt, pcov = curve_fit(f=sine_func, xdata=time_values, ydata=time_series, p0=(1, 1))
+
+            # Extract the fitted parameters
+            a_fit, phi_fit = popt
+
+            # If a_fit is negative, take the absolute value and add pi to phi_fit
+            if a_fit < 0:
+                a_fit = np.abs(a_fit)
+                phi_fit += np.pi
+
+            a_fits.append(a_fit)
+            phi_fits.append(phi_fit)
+
+        return a_fits, phi_fits
 
     def visualize(self, time_point, projection, direction, fig=None, globe=None, ax=None, return_fig=False):
         """

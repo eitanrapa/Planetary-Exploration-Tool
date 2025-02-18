@@ -70,6 +70,15 @@ for i in range(10):
     interferogram.load()
     interferograms.append(interferogram)
 
+# Make a time series object
+time_series = pet.operations.timeSeries(planet=planet, conops=conops, instrument=instrument)
+
+# # Read the amplitudes, phases, and topographical errors
+# amplitudes, amplitude_uncertainties, phases, phases_uncertainties, zs = time_series.create_1d_time_series(
+#     interferograms=interferograms, spatial_points=np.asarray([[0, 90.0]]))
+#
+# print(amplitudes, amplitude_uncertainties, phases, phases_uncertainties, zs)
+
 track1 = pet.operations.track(start_time=times[1], end_time=times[2], planet=planet, instrument=instrument,
                               conops=conops, temporal_resolution=20, spatial_resolution=2000)
 track1.load()
@@ -182,14 +191,17 @@ for i in range(10):
     interferogram.load()
     interferograms.append(interferogram)
 
-# Make a time series object
-time_series = pet.operations.timeSeries(planet=planet, conops=conops)
+lats = np.linspace(89.5, -89.5, 359)
+lons = np.linspace(179.5, -179.5, 719)
+lats, lons = np.meshgrid(lats, lons)
 
 # Read the amplitudes, phases, and topographical errors
-amplitudes, phases, zs = time_series.create_3d_time_series(
-    interferograms=interferograms, spatial_points=np.asarray([[-88, 2.0]]))
+amplitudes, amplitude_uncertainties, phases, phases_uncertainties, zs = time_series.create_3d_time_series(
+    interferograms=interferograms, spatial_points=np.asarray([lats.flatten(), lons.flatten()]).T)
 
-print(amplitudes, phases)
+# Save the amplitudes and phases
+np.save("amplitudes.npy", amplitudes)
+np.save("phase.npy", phases)
 
 fm.clear()
 

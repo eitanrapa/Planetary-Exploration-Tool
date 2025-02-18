@@ -207,8 +207,16 @@ class Interferogram(pet.component):
         # Calculate flattened values
         psis = self.baseline / (distances * np.sin(angles))
 
+        # Total LOS displacement with baseline uncertainties
+        los_displacements_with_baseline_errors = (
+                los_displacements + psis*np.random.normal(loc=0, scale=self.planet.topography_uncertainty))
+
+        # Total LOS displacement with instrument noise
+        los_displacements_with_noise = self.instrument.get_instrument_noise(
+            measured_los=los_displacements_with_baseline_errors)
+
         # Create array and save the data
-        self.create_data_array(los_displacements=los_displacements, psis=psis)
+        self.create_data_array(los_displacements=los_displacements_with_noise, psis=psis)
 
     def visualize_interferogram(self, projection, fig=None, globe=None, ax=None, return_fig=False):
         """
