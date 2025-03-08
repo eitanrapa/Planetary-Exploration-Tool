@@ -42,16 +42,4 @@ enu_vectors_converted = vector_conversions.cartesian_to_enu_vector(uvw_vectors=u
 print(enu_vectors)
 print(enu_vectors_converted)
 
-enu_vectors_converted = vector_conversions.cartesian_to_enu_vector(uvw_vectors=[0.03235701, 0.04570475, 0.15202331],
-                                                                   latitudes=[-80.86934153434505],
-                                                                   longitudes=[-76.20298809467269])
-
-print(enu_vectors_converted)
-
-enu_vectors_converted = vector_conversions.cartesian_to_enu_vector(uvw_vectors=[0.01231144, 0.05606153, 0.27252711],
-                                                                   latitudes=[-80.86934153434505],
-                                                                   longitudes=[-76.20298809467269])
-
-print(enu_vectors_converted)
-
 # end of file
