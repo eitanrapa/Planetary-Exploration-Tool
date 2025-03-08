@@ -41,22 +41,22 @@ from . import meta
 from . import protocols
 # planets
 from . import planets
-# concepts of operation
-from . import conOps
+# campaigns
+from . import campaigns
 # instruments
 from . import instruments
 # geophysical
-from . import geophysical
-# simulations
-from . import simulations
+from . import natureSimulations
 # conversions
 from . import conversions
-# operations
-from . import operations
 # projections
 from . import projections
-# spicetoolkit
-from . import spicetoolkit
+# spiceTools
+from . import spiceTools
+# data analysis
+from . import dataAnalysis
+# data acquisition
+from . import dataAcquisition
 
 # by convention
 __version__ = meta.version
