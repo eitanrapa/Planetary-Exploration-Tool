@@ -8,7 +8,7 @@
 import pet
 
 # Create a file manager
-fm = pet.spicetoolkit.fileManager(folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input")
+fm = pet.spiceTools.fileManager(folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input")
 
 # Furnish some files
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
@@ -17,11 +17,13 @@ fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tp
 # Make a planet
 planet = pet.planets.enceladus(name="enceladus")
 
-print(planet.get_axes())
+print([axis.value for axis in planet.get_axes()])
 
 # Make a projection
-projection = pet.projections.biaxialPlanar(name="biaxial planar", central_latitude=-90, north_extent=-30,
-                                           folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/figs")
+projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar",
+                                                              central_latitude=-90, north_extent=-30,
+                                                              folder_path="/home/user/Documents/"
+                                                                          "GitHub/Planetary-Exploration-Tool/figs")
 
 # Visualize
 planet.visualize_topography(projection=projection)

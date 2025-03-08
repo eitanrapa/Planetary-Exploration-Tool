@@ -5,6 +5,12 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from . import biaxialProjections
+import pet
+
+# Make an instrument
+instrument = pet.instruments.inSAR.chirpChirp(name="chirp chirp")
+
+# Print the bandwidth
+print(instrument.bw)
 
 # end of file

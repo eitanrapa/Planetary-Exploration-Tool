@@ -5,6 +5,12 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from . import biaxialProjections
+import pet
+
+
+class InSAR(pet.protocol, family="pet.instruments"):
+    """
+    The abstract specification for radar instruments
+    """
 
 # end of file

@@ -5,6 +5,6 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from . import biaxialProjections
+from .TidalDeformationMap import TidalDeformationMap as tidalDeformationMap
 
 # end of file

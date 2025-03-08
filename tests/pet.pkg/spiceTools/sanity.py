@@ -12,7 +12,7 @@ Sanity check: verify that the {pet} package is accessible
 
 def test():
     # access the {pet.shapes} sub-package
-    import pet.conversions
+    import pet.spiceTools
     # all done
     return
 
