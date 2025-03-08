@@ -5,6 +5,6 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-from . import biaxialProjections
+from . import orbiter
 
 # end of file

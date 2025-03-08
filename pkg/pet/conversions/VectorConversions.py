@@ -10,7 +10,8 @@ import pet
 import numpy as np
 
 
-class VectorConversions(pet.component):
+class VectorConversions(pet.component, family="pet.conversions.vectorConversions",
+                        implements=pet.protocols.conversion):
     """
     Class that encapsulates conversions between ENU and Cartesian vectors
     """
