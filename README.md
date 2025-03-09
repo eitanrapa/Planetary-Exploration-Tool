@@ -10,9 +10,10 @@ Tool for creating a digital twin of a mission to a solar system body.
 
 1. Have/install GCC and GNU make
 2. Have/install at least Python 3.7.2
-3. Clone https://github.com/aivazis/mm.git
-4. Clone https://github.com/pyre/pyre
-5. Create mm config file:
+3. Have/install CSPYCE (https://github.com/SETI/rms-cspyce)
+4. Clone https://github.com/aivazis/mm.git
+5. Clone https://github.com/pyre/pyre
+6. Create mm config file:
     a. Go to home directory
     b. Go to or create a .config directory
     c. Create a directory called "mm"
@@ -63,7 +64,7 @@ Tool for creating a digital twin of a mission to a solar system body.
         
         # end of file
 
-6. Create the mm yaml file:
+7. Create the mm yaml file:
     a. Go to home directory
     b. Go to .config directory
     c. Create a directory called "pyre"
@@ -97,7 +98,7 @@ Tool for creating a digital twin of a mission to a solar system body.
 
         # end of file
         
-7. Create a conda/mamba environment for the package
+8. Create a conda/mamba environment for the package
     a. Install conda/mamba if necessary
     b. Make a file in any directory and call it "pet.yaml"
     c. Copy and paste the following into the file:
@@ -145,12 +146,15 @@ Tool for creating a digital twin of a mission to a solar system body.
           - tqdm
           - scipy
           - h5py
+          - cartopy
+          - xarray
+          - alphashape
 
         # end of file
 
     d. Run the command "conda env create -f pet.yaml"
     e. Activate the environment
     
-8. Go to the pyre directory and run the command "python3 [PATH]/mm/mm.py" replacing [PATH] with the path to the mm directory
-9. Go to the PET directory and run the command "python3 [PATH]/mm/mm.py" replacing [PATH] with the path to the mm directory
-10. Ready to go!
+9. Go to the pyre directory and run the command "python3 [PATH]/mm/mm.py" replacing [PATH] with the path to the mm directory
+10. Go to the PET directory and run the command "python3 [PATH]/mm/mm.py" replacing [PATH] with the path to the mm directory
+11. Ready to go!
