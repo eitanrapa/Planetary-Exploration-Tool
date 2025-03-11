@@ -16,10 +16,9 @@ from shapely.geometry import Point
 import xarray as xr
 
 
-class SurfaceDeformation3DTimeSeries(
-    pet.component, family="pet.dataAnalysis.surfaceDeformationAnalysis.surfaceDeformation3DTimeSeries",
-    implements=pet.protocols.dataAnalysis.surfaceDeformationAnalysis):
-
+class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
+                                                           "surfaceDeformationAnalysis.surfaceDeformation3DTimeSeries",
+                                     implements=pet.protocols.dataAnalysis.surfaceDeformationAnalysis):
     """
     Class that is able to create time series information from loaded interferograms
     """
@@ -38,20 +37,33 @@ class SurfaceDeformation3DTimeSeries(
     @classmethod
     def from_file(cls, planet, campaign, instrument, file_name):
         """
-
+        Load a track from an HDF5 file
+        :param planet: planet object
+        :param campaign: campaign object
+        :param instrument: instrument object
+        :param file_name: name of the file to load
+        :return: a SurfaceDeformation3DTimeSeries object
         """
 
         # Open the HDF5 file in read mode
         data = xr.open_dataset(filename_or_obj=file_name)
 
+        # Create the object
         obj = cls(name="time_series" + str(np.random.rand()), planet=planet, campaign=campaign, instrument=instrument)
+
         obj.data = data  # Restore computed result
+
         return obj
 
     @classmethod
     def from_files(cls, planet, campaign, instrument, file_list):
         """
-
+        Load a list of tracks from HDF5 files
+        :param planet: planet object
+        :param campaign: campaign object
+        :param instrument: instrument object
+        :param file_list: list of file names to load
+        :return: a list of SurfaceDeformation3DTimeSeries objects
         """
 
         # Load all the files
@@ -77,20 +89,41 @@ class SurfaceDeformation3DTimeSeries(
         :param phases: phases to be saved
         :param phase_uncertainties: phase uncertainties to be saved
         :param topography_corrections: topography corrections to be saved
+        :return: Nothing returned
         """
 
         # Create the xarray Dataset
         da = xr.DataArray(
-            data=amplitudes,
+            data=topography_corrections,
             dims=["points"],
             coords={
-                "amplitude_uncertainties": ("points", np.asarray(amplitude_uncertainties)),
-                "phases": ("points", np.asarray(phases)),
-                "phase_uncertainties": ("points", np.asarray(phase_uncertainties)),
-                "topography_corrections": ("points", np.asarray(topography_corrections)),
+                "amplitudes_east": ("points", np.asarray([amplitude[0] for amplitude in amplitudes])),
+                "amplitudes_north": ("points", np.asarray([amplitude[1] for amplitude in amplitudes])),
+                "amplitudes_up": ("points", np.asarray([amplitude[2] for amplitude in amplitudes])),
+                "amplitude_uncertainties_east":
+                    ("points", np.asarray([amplitude_uncertainty[0] for
+                                           amplitude_uncertainty in amplitude_uncertainties])),
+                "amplitude_uncertainties_north":
+                    ("points", np.asarray([amplitude_uncertainty[1] for
+                                           amplitude_uncertainty in amplitude_uncertainties])),
+                "amplitude_uncertainties_up":
+                    ("points", np.asarray([amplitude_uncertainty[2] for
+                                           amplitude_uncertainty in amplitude_uncertainties])),
+                "phases_east": ("points", np.asarray([phase[0] for phase in phases])),
+                "phases_north": ("points", np.asarray([phase[1] for phase in phases])),
+                "phases_up": ("points", np.asarray([phase[2] for phase in phases])),
+                "phase_uncertainties_east":
+                    ("points", np.asarray([phase_uncertainty[0] for
+                                           phase_uncertainty in phase_uncertainties])),
+                "phase_uncertainties_north":
+                    ("points", np.asarray([phase_uncertainty[1] for
+                                           phase_uncertainty in phase_uncertainties])),
+                "phase_uncertainties_up":
+                    ("points", np.asarray([phase_uncertainty[2] for
+                                           phase_uncertainty in phase_uncertainties])),
                 "latitude": ("points", np.asarray([point[0] for point in geodetic_coordinates])),
                 "longitude": ("points", np.asarray([point[1] for point in geodetic_coordinates]))},
-            name="amplitudes",
+            name="topography_corrections",
             attrs=dict(
                 body_id=self.campaign.body_id,
             ),
@@ -100,18 +133,29 @@ class SurfaceDeformation3DTimeSeries(
         self.data = da
 
     def calculate_uncertainty(self, uncertainty_c, uncertainty_s, a, phase):
+        """
+        Calculate the uncertainty of the amplitude and phase
+        :param uncertainty_c: uncertainty of the c parameter
+        :param uncertainty_s: uncertainty of the s parameter
+        :param a: amplitude
+        :param phase: phase
+        :return: uncertainty of the amplitude, uncertainty of the phase
+        """
 
+        # Calculate the uncertainties
         sigma_a = np.sqrt((uncertainty_c * np.sin(phase) ** 2 - uncertainty_s * np.cos(phase) ** 2) /
                           (np.sin(phase) ** 4 - np.cos(phase) ** 4))
         sigma_phase = np.sqrt((-uncertainty_c * np.cos(phase) ** 2 + uncertainty_s * np.sin(phase) ** 2) /
                               (a ** 2 * (np.sin(phase) ** 4 - np.cos(phase) ** 4)))
+
         return sigma_a, sigma_phase
 
-    def create_3d_time_series(self, interferograms, spatial_points, alpha=0.3, allow_sub_3d=False):
+    def create_3d_time_series(self, interferograms, spatial_points, alpha=0.3):
         """
         Return the amplitudes, phases, and topographic errors of a set of points in 3 or more look directions
         :param interferograms: interferograms to analyze
         :param spatial_points: points to do the inverse problem on
+        :param alpha: alpha value for the alpha shape
         :return: amplitudes, phases, topographic errors
         """
 
@@ -161,7 +205,7 @@ class SurfaceDeformation3DTimeSeries(
                     values = data_array[var].values
 
                 # Perform interpolation only for valid points
-                interpolated_values = griddata(points=points, values=values, xi=valid_points, method="nearest")
+                interpolated_values = griddata(points=points, values=values, xi=valid_points, method="cubic")
 
                 # Assign interpolated values back to the corresponding positions
                 results[var][is_inside] = interpolated_values
@@ -238,12 +282,13 @@ class SurfaceDeformation3DTimeSeries(
 
         for i in tqdm(range(len(spatial_points)), desc="Calculating inverse problems..."):
 
-            if (len(line_of_sight_vectors[i]) < 3 and allow_sub_3d is False) or len(line_of_sight_vectors[i]) < 1:
+            # Check if the point has enough line of sight vectors
+            if len(line_of_sight_vectors[i]) < 3:
                 amplitudes.append([np.nan, np.nan, np.nan])
                 amplitude_uncertainties.append([np.nan, np.nan, np.nan])
                 phases.append([np.nan, np.nan, np.nan])
                 phase_uncertainties.append([np.nan, np.nan, np.nan])
-                topography_corrections.append([np.nan])
+                topography_corrections.append(np.nan)
 
             else:
                 # Do the inverse problem
@@ -254,8 +299,6 @@ class SurfaceDeformation3DTimeSeries(
                 c1, c2, c3, s1, s2, s3, z = m
 
                 # Calculate amplitudes and phases
-                covariance_matrix = np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_ds[i]) @ g_matrices[i])
-                main_diagonal = np.diag(covariance_matrix).tolist()
                 a1 = np.sqrt(c1 ** 2 + s1 ** 2)
 
                 # If a1 is negative, flip the sign and add pi to the phase
@@ -283,8 +326,17 @@ class SurfaceDeformation3DTimeSeries(
                 else:
                     phase3 = np.arctan2(c3, s3)
 
+                # Append the results
                 calculated_amplitudes = [a1, a2, a3]
                 calculated_phases = [phase1, phase2, phase3]
+                amplitudes.append(calculated_amplitudes)
+                phases.append(calculated_phases)
+                topography_corrections.append(z)
+
+                # Calculate the uncertainty of the amplitudes and phases
+                covariance_matrix = np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_ds[i]) @ g_matrices[i])
+                main_diagonal = np.diag(covariance_matrix).tolist()
+
                 uncertainty_a1, uncertainty_phase1 = self.calculate_uncertainty(uncertainty_c=main_diagonal[0],
                                                                                 uncertainty_s=main_diagonal[1],
                                                                                 a=a1, phase=phase1)
@@ -294,24 +346,31 @@ class SurfaceDeformation3DTimeSeries(
                 uncertainty_a3, uncertainty_phase3 = self.calculate_uncertainty(uncertainty_c=main_diagonal[4],
                                                                                 uncertainty_s=main_diagonal[5],
                                                                                 a=a3, phase=phase3)
-                amplitudes.append(calculated_amplitudes)
-                phases.append(calculated_phases)
+
+                # Append the uncertainties
                 amplitude_uncertainties.append([uncertainty_a1, uncertainty_a2, uncertainty_a3])
                 phase_uncertainties.append([uncertainty_phase1, uncertainty_phase2, uncertainty_phase3])
-                topography_corrections.append([z])
 
+        # Create the data array
         self.create_data_array(geodetic_coordinates=spatial_points, amplitudes=amplitudes,
                                amplitude_uncertainties=amplitude_uncertainties, phases=phases,
                                phase_uncertainties=phase_uncertainties, topography_corrections=topography_corrections)
 
-    def create_3d_time_series_from_1d(self, time_series):
-        """
+    # def create_3d_time_series_from_1d(self, time_series):
+    #     """
+    #
+    #     """
 
+    def visualize_time_series_amplitudes(self, projection, direction, fig=None, globe=None, ax=None, return_fig=False):
         """
-
-    def visualize_time_series_amplitudes(self, projection, fig=None, globe=None, ax=None, return_fig=False):
-        """
-
+        Visualize the amplitudes of the time series
+        :param projection: Cartopy projection
+        :param direction: east, north, or up
+        :param fig: matplotlib figure
+        :param globe: cartopy globe
+        :param ax: matplotlib ax
+        :param return_fig: Whether to return fig, globe, ax
+        :return: fig, ax, globe if return_fig is True
         """
 
         if fig is None:
@@ -319,7 +378,15 @@ class SurfaceDeformation3DTimeSeries(
             fig, ax, globe = projection.proj(planet=self.planet)
 
         # Load the values to plot
-        amplitudes = self.data.values
+        if direction == "east":
+            amplitudes = self.data["amplitudes_east"].values
+        elif direction == "north":
+            amplitudes = self.data["amplitudes_north"].values
+        elif direction == "up":
+            amplitudes = self.data["amplitudes_up"].values
+        else:
+            raise Exception("direction must be east, north, or up")
+
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
 
@@ -341,12 +408,19 @@ class SurfaceDeformation3DTimeSeries(
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/' + 'time_series_amplitudes_' +
-                          self.deformation_map.pyre_name + '_' + str(self.campaign.body_id) + '.png', format='png',
+                    str(self.campaign.body_id) + '.png', format='png',
                     dpi=500)
 
-    def visualize_time_series_phases(self, projection, fig=None, globe=None, ax=None, return_fig=False):
+    def visualize_time_series_phases(self, projection, direction, fig=None, globe=None, ax=None, return_fig=False):
         """
-
+        Visualize the phases of the time series
+        :param projection: Cartopy projection
+        :param direction: east, north, or up
+        :param fig: matplotlib figure
+        :param globe: cartopy globe
+        :param ax: matplotlib ax
+        :param return_fig: Whether to return fig, globe, ax
+        :return: fig, ax, globe if return_fig is True
         """
 
         if fig is None:
@@ -354,7 +428,14 @@ class SurfaceDeformation3DTimeSeries(
             fig, ax, globe = projection.proj(planet=self.planet)
 
         # Load the values to plot
-        phases = self.data["phases"].values
+        if direction == "east":
+            phases = self.data["phases_east"].values
+        elif direction == "north":
+            phases = self.data["phases_north"].values
+        elif direction == "up":
+            phases = self.data["phases_up"].values
+        else:
+            raise Exception("direction must be east, north, or up")
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
 
@@ -376,7 +457,7 @@ class SurfaceDeformation3DTimeSeries(
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/' + 'time_series_phases_' +
-                          self.deformation_map.pyre_name + '_' + str(self.campaign.body_id) + '.png', format='png',
+                    str(self.campaign.body_id) + '.png', format='png',
                     dpi=500)
 
 # end of file

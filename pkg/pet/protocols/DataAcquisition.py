@@ -10,7 +10,7 @@ import pet
 
 class DataAcquisition(pet.protocol, family="pet.dataAcquisition"):
     """
-    The abstract specification for a concept of operation
+    The abstract specification for data acquisition classes
     """
 
 

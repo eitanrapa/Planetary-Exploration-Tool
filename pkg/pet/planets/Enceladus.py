@@ -107,6 +107,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         :param globe: cartopy globe
         :param ax: matplotlib ax
         :param return_fig: Whether to return fig, globe, ax
+        :return: fig, ax, globe if return_fig is True
         """
 
         # Load the topography from DSK

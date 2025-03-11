@@ -33,7 +33,7 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
     planet.doc = "target planet"
 
     campaign = pet.protocols.campaigns.orbiter()
-    campaign.doc = "campaign (must be an oribiter)"
+    campaign.doc = "campaign (must be an orbiter)"
 
     instrument = pet.protocols.instruments.inSAR()
     instrument.doc = "observation instrument"
@@ -51,18 +51,27 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
     @classmethod
     def from_file(cls, planet, campaign, instrument, file_name):
         """
-
+        Load a track from an HDF5 file
+        :param planet: Planet object
+        :param campaign: Campaign object
+        :param instrument: Instrument object
+        :param file_name: File name of HDF5 file
+        :return: Track object
         """
 
         # Open the HDF5 file in read mode
         data = xr.open_dataarray(filename_or_obj=file_name)
 
+        # Get the start and end times
         start_time = data.attrs["start_time"]
         end_time = data.attrs["end_time"]
+
+        # Create the object
         obj = cls(name="track" + str(np.random.rand()), start_time=start_time, end_time=end_time,
                   planet=planet, campaign=campaign, instrument=instrument,
                   temporal_resolution=data.attrs["temporal_resolution"],
                   spatial_resolution=data.attrs["spatial_resolution"])
+
         obj.data = data  # Restore computed result
 
         return obj
@@ -70,15 +79,25 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
     @classmethod
     def from_data_array(cls, planet, campaign, instrument, data):
         """
-
+        Create a track object from a data array
+        :param planet: Planet object
+        :param campaign: Campaign object
+        :param instrument: Instrument object
+        :param data: Data array
+        :return: Track object
         """
+
+        # Get the start and end times
         start_time = data.attrs["start_time"]
         end_time = data.attrs["end_time"]
+
+        # Create the object
         obj = cls(name="track" + str(start_time) + str(end_time),
                   start_time=start_time, end_time=end_time,
                   planet=planet, campaign=campaign, instrument=instrument,
                   temporal_resolution=data.attrs["temporal_resolution"],
                   spatial_resolution=data.attrs["spatial_resolution"])
+
         obj.data = data  # Restore computed result
 
         return obj
@@ -86,7 +105,12 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
     @classmethod
     def from_files(cls, planet, campaign, instrument, file_list):
         """
-
+        Load a list of tracks from HDF5 files
+        :param planet: Planet object
+        :param campaign: Campaign object
+        :param instrument: Instrument object
+        :param file_list: List of file names
+        :return: List of track objects
         """
 
         # Load all the files
@@ -109,6 +133,7 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         :param geodetic_coordinates: lat, long, height coordinates to be saved
         :param look_angles: Calculated look angles from satellite
         :param times: Times of observation for points
+        :return: Nothing returned
         """
 
         # Create the xarray Dataset
@@ -139,7 +164,9 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
 
     def modify_time(self, time):
         """
-
+        Modify the time of the track
+        :param time: Time to add to the track
+        :return: Nothing returned
         """
 
         self.start_time = self.start_time + time
@@ -170,6 +197,7 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
     def calculate_ground_swath(self):
         """
         Vectorized calculation of the ground swath.
+        :return: Nothing returned
         """
 
         # Get the time space
@@ -404,7 +432,7 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         :param globe: cartopy globe
         :param ax: matplotlib ax
         :param return_fig: Whether to return fig, globe, ax
-        :return: Nothing returned
+        :return: fig, ax, globe if return_fig is True
         """
 
         if fig is None:

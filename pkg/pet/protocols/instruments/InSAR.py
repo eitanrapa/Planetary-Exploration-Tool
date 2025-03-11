@@ -10,7 +10,7 @@ import pet
 
 class InSAR(pet.protocol, family="pet.instruments"):
     """
-    The abstract specification for radar instruments
+    The abstract specification for InSAR instruments
     """
 
 # end of file

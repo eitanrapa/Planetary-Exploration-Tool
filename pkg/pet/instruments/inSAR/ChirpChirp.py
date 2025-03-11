@@ -31,16 +31,13 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     look_direction.doc = "look direction of the radar instrument"
 
     def __init__(self, **kwargs):
-        """
-
-        """
-
         super().__init__(**kwargs)
 
+        # Calculate the beamwidth
         d_inv = 1 / self.antenna_elevation_width
-
         self.bw = np.rad2deg(np.arcsin(d_inv * self.wavelength))
 
+        # Calculate the start and end look angles
         self.start_look_angle = self.look_angle - self.bw
         self.end_look_angle = self.look_angle + self.bw
 

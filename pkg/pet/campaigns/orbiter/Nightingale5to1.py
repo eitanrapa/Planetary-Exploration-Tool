@@ -28,13 +28,12 @@ class Nightingale5to1(pet.component, family="pet.campaigns.orbiter.nightingale5t
     planet.doc = "target planet"
 
     def __init__(self, **kwargs):
-        """
-
-        """
-
         super().__init__(**kwargs)
 
+        # Get the times of the first five tracks
         self.times = self.get_five_tracks()
+
+        # Get the orbit cycle
         self.orbit_cycle = self.times[5] - self.times[0]
 
         return
@@ -130,6 +129,7 @@ class Nightingale5to1(pet.component, family="pet.campaigns.orbiter.nightingale5t
         :param globe: cartopy globe
         :param ax: matplotlib ax
         :param return_fig: Whether to return the fig, ax, globe objects
+        :return: fig, ax, globe if return_fig is True
         """
 
         # Create a time conversion instance

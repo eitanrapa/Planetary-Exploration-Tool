@@ -13,7 +13,7 @@ from itertools import combinations
 class InterferogramPairOptimization(pet.component, family="pet.dataAcquisition.interferogramPairOptimization",
                                     implements=pet.protocols.dataAcquisition):
     """
-    Class that encapsulates a standalone simulation of many orbits in a mission and the onboard interferogram processing
+    Class that encapsulates the onboard interferogram selecting algorithm
     """
 
     planet = pet.protocols.planet()

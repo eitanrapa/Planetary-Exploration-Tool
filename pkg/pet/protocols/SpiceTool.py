@@ -10,7 +10,7 @@ import pet
 
 class SpiceTool(pet.protocol, family="pet.spiceTools"):
     """
-    The abstract specification for conversions
+    The abstract specification for spice tools
     """
 
 # end of file

@@ -104,6 +104,12 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
         return u_displacements, v_displacements, w_displacements
 
     def time_series(self, spatial_points, direction):
+        """
+        Get the time series of displacements for a set of spatial points
+        :param spatial_points: List of spatial points in the form (latitude, longitude)
+        :param direction: Vector direction to view, east, north, or up
+        :return: Time series of displacements for each spatial point
+        """
 
         # Read the necessary data
         colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube = self.read_displacements()
@@ -140,8 +146,12 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
                                                    values=up_cube, method='linear', bounds_error=False,
                                                    fill_value=None)
 
+        else:
+            raise Exception("direction must be east, north, or up")
+
         for point in tqdm(spatial_points, "Interpolating points, fitting curves..."):
 
+            # Create an array of time values from 0 to the tidal cycle
             time_values = np.linspace(0, self.planet.tidal_cycle.value, len(times))
 
             # Extract the time series for the spatial point, convert longitude to 0 - 360 forma
@@ -173,7 +183,7 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
         :param globe: cartopy globe
         :param ax: matplotlib ax
         :param return_fig: Whether to return fig, globe, ax
-        :return: Nothing returned
+        :return: fig, globe, ax if return_fig is True
         """
 
         if fig is None:
@@ -194,6 +204,7 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
             # Loop through each (i, j) point in the 2D grid
             for i in range(len(east_cube[:, 0, 0])):
                 for j in range(len(east_cube[0, :, 0])):
+
                     # Extract the time series for the (i, j) point
                     time_series = east_cube[i, j, :]
 
@@ -213,6 +224,7 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
             # Loop through each (i, j) point in the 2D grid
             for i in range(len(north_cube[:, 0, 0])):
                 for j in range(len(north_cube[0, :, 0])):
+
                     # Extract the time series for the (i, j) point
                     time_series = north_cube[i, j, :]
 
@@ -232,6 +244,7 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
             # Loop through each (i, j) point in the 2D grid
             for i in range(len(up_cube[:, 0, 0])):
                 for j in range(len(up_cube[0, :, 0])):
+
                     # Extract the time series for the (i, j) point
                     time_series = up_cube[i, j, :]
 
