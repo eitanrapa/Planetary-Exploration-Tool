@@ -18,7 +18,7 @@ class TimeConversion(pet.component):
     def _convert_ets(self, utcs):
         """
         Converts a time string to Ephemeris Time using a loaded leap seconds file
-        :param times: String to be converted
+        :param utcs: String to be converted
         :return: Ephemeris time float
         """
 

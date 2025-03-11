@@ -36,7 +36,10 @@ for i in range(len(directions)):
 
     # Define a projection
     projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", central_latitude=-90,
-                                                                 north_extent=-40, folder_path="/figs")
+                                                                 north_extent=-40,
+                                                                  folder_path="/home/user/"
+                                                                              "Documents/GitHub/"
+                                                                              "Planetary-Exploration-Tool/figs")
 
     fig, ax, globe = projection.proj(planet=planet)
 

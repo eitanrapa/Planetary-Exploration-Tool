@@ -4,6 +4,8 @@
 #
 # the pet development team
 # (c) 2023-2024 all rights reserved
+
+import threading
 import numpy as np
 import pet
 
@@ -41,158 +43,158 @@ deformation_map = pet.natureSimulations.geophysicalModel.tidalDeformationMap(nam
                                                                                                     "_Results.hdf5",
                                                                              planet=planet)
 
-# Make a bunch of interferograms
-interferograms = []
+#
+# track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track1")
+#
+# track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track1")
+#
+# for i in range(10):
+#     track1.modify_time(orbit_cycle_time * i)
+#
+#     track2.modify_time(orbit_cycle_time * (i + 1))
+#
+#     interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
+#                                                                                     instrument=instrument,
+#                                                                                     planet=planet,
+#                                                                                     deformation_map=deformation_map,
+#                                                                                     track1=track1, track2=track2,
+#                                                                                     campaign=campaign, baseline="20*m")
+#     interferogram.calculate_igram()
+#
+#     # Save interferogram
+#     interferogram.save(file_name="/home/user/Documents/GitHub/"
+#                                  "Planetary-Exploration-Tool/files/igram_base_{}".format(i))
 
-track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track1")
+# track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track2")
+#
+# track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track2")
+#
+# for i in range(10):
+#     track1.modify_time(orbit_cycle_time * i)
+#
+#     track2.modify_time(orbit_cycle_time * (i + 1))
+#
+#     interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
+#                                                                                     instrument=instrument,
+#                                                                                     planet=planet,
+#                                                                                     deformation_map=deformation_map,
+#                                                                                     track1=track1, track2=track2,
+#                                                                                     campaign=campaign, baseline="20*m")
+#     interferogram.calculate_igram()
+#
+#     # Save interferogram
+#     interferogram.save(file_name="/home/user/Documents/GitHub/"
+#                                  "Planetary-Exploration-Tool/files/igram_base_1{}".format(i))
 
-track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track1")
+# track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track3")
+#
+# track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track3")
+#
+# for i in range(10):
+#     track1.modify_time(orbit_cycle_time * i)
+#
+#     track2.modify_time(orbit_cycle_time * (i + 1))
+#
+#     interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
+#                                                                                     instrument=instrument,
+#                                                                                     planet=planet,
+#                                                                                     deformation_map=deformation_map,
+#                                                                                     track1=track1, track2=track2,
+#                                                                                     campaign=campaign, baseline="20*m")
+#     interferogram.calculate_igram()
+#
+#     # Save interferogram
+#     interferogram.save(file_name="/home/user/Documents/GitHub/"
+#                                  "Planetary-Exploration-Tool/files/igram_base_2{}".format(i))
+#
+# track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track4")
+#
+# track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track4")
+#
+# for i in range(10):
+#     track1.modify_time(orbit_cycle_time * i)
+#
+#     track2.modify_time(orbit_cycle_time * (i + 1))
+#
+#     interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
+#                                                                                     instrument=instrument,
+#                                                                                     planet=planet,
+#                                                                                     deformation_map=deformation_map,
+#                                                                                     track1=track1, track2=track2,
+#                                                                                     campaign=campaign, baseline="20*m")
+#     interferogram.calculate_igram()
+#
+#     # Save interferogram
+#     interferogram.save(file_name="/home/user/Documents/GitHub/"
+#                                  "Planetary-Exploration-Tool/files/igram_base_3{}".format(i))
 
-for i in range(10):
-    track1.modify_time(orbit_cycle_time * i)
+# track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track5")
+#
+# track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+#                                              file_name="/home/user/Documents/GitHub/"
+#                                                        "Planetary-Exploration-Tool/files/track5")
+#
+# for i in range(10):
+#     track1.modify_time(orbit_cycle_time * i)
+#
+#     track2.modify_time(orbit_cycle_time * (i + 1))
+#
+#     interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
+#                                                                                     instrument=instrument,
+#                                                                                     planet=planet,
+#                                                                                     deformation_map=deformation_map,
+#                                                                                     track1=track1, track2=track2,
+#                                                                                     campaign=campaign, baseline="20*m")
+#     interferogram.calculate_igram()
+#
+#     # Save interferogram
+#     interferogram.save(file_name="/home/user/Documents/GitHub/"
+#                                  "Planetary-Exploration-Tool/files/igram_base_4{}".format(i))
 
-    track2.modify_time(orbit_cycle_time * (i + 1))
-
-    interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
-                                                                                    instrument=instrument,
-                                                                                    planet=planet,
-                                                                                    deformation_map=deformation_map,
-                                                                                    track1=track1, track2=track2,
-                                                                                    campaign=campaign, baseline="20*m")
-    interferogram.calculate_igram()
-
-    # Save interferogram
-    interferogram.save(file_name="/home/user/Documents/GitHub/"
-                                 "Planetary-Exploration-Tool/files/igram_base_{}".format(i))
-
-track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track2")
-
-track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track2")
-
-for i in range(10):
-    track1.modify_time(orbit_cycle_time * i)
-
-    track2.modify_time(orbit_cycle_time * (i + 1))
-
-    interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
-                                                                                    instrument=instrument,
-                                                                                    planet=planet,
-                                                                                    deformation_map=deformation_map,
-                                                                                    track1=track1, track2=track2,
-                                                                                    campaign=campaign, baseline="20*m")
-    interferogram.calculate_igram()
-
-    # Save interferogram
-    interferogram.save(file_name="/home/user/Documents/GitHub/"
-                                 "Planetary-Exploration-Tool/files/igram_base_1{}".format(i))
-
-track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track3")
-
-track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track3")
-
-for i in range(10):
-    track1.modify_time(orbit_cycle_time * i)
-
-    track2.modify_time(orbit_cycle_time * (i + 1))
-
-    interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
-                                                                                    instrument=instrument,
-                                                                                    planet=planet,
-                                                                                    deformation_map=deformation_map,
-                                                                                    track1=track1, track2=track2,
-                                                                                    campaign=campaign, baseline="20*m")
-    interferogram.calculate_igram()
-
-    # Save interferogram
-    interferogram.save(file_name="/home/user/Documents/GitHub/"
-                                 "Planetary-Exploration-Tool/files/igram_base_2{}".format(i))
-
-track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track4")
-
-track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track4")
-
-for i in range(10):
-    track1.modify_time(orbit_cycle_time * i)
-
-    track2.modify_time(orbit_cycle_time * (i + 1))
-
-    interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
-                                                                                    instrument=instrument,
-                                                                                    planet=planet,
-                                                                                    deformation_map=deformation_map,
-                                                                                    track1=track1, track2=track2,
-                                                                                    campaign=campaign, baseline="20*m")
-    interferogram.calculate_igram()
-
-    # Save interferogram
-    interferogram.save(file_name="/home/user/Documents/GitHub/"
-                                 "Planetary-Exploration-Tool/files/igram_base_3{}".format(i))
-
-track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track5")
-
-track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track5")
-
-for i in range(10):
-    track1.modify_time(orbit_cycle_time * i)
-
-    track2.modify_time(orbit_cycle_time * (i + 1))
-
-    interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram".format(i),
-                                                                                    instrument=instrument,
-                                                                                    planet=planet,
-                                                                                    deformation_map=deformation_map,
-                                                                                    track1=track1, track2=track2,
-                                                                                    campaign=campaign, baseline="20*m")
-    interferogram.calculate_igram()
-
-    # Save interferogram
-    interferogram.save(file_name="/home/user/Documents/GitHub/"
-                                 "Planetary-Exploration-Tool/files/igram_base_4{}".format(i))
-
-path = "/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/"
-interferogram_files = [path + 'igram_base_{}'.format(i) for i in range(50)]
-interferograms = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram.from_files(instrument=instrument,
-                                                                                            planet=planet,
-                                                                                            deformation_map=
-                                                                                            deformation_map,
-                                                                                            campaign=campaign,
-                                                                                            file_list=
-                                                                                            interferogram_files)
-
-lats = np.linspace(89.5, -89.5, 359)
-lons = np.linspace(179.5, -179.5, 719)
-lats, lons = np.meshgrid(lats, lons)
-
-# Make a time series object
-time_series = pet.dataAnalysis.surfaceDeformationAnalysis.surfaceDeformation3DTimeSeries(name="3d time series",
-                                                                                         planet=planet,
-                                                                                         campaign=campaign,
-                                                                                         instrument=instrument)
-
-# Read the amplitudes, phases, and topographical errors
-time_series.create_3d_time_series(interferograms=interferograms,
-                                  spatial_points=np.asarray([lats.flatten(), lons.flatten()]).T, allow_sub_3d=True)
-time_series.save(file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/time_series_3d_base")
+# path = "/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/"
+# interferogram_files = [path + 'igram_base_{}'.format(i) for i in range(50)]
+# interferograms = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram.from_files(instrument=instrument,
+#                                                                                             planet=planet,
+#                                                                                             deformation_map=
+#                                                                                             deformation_map,
+#                                                                                             campaign=campaign,
+#                                                                                             file_list=
+#                                                                                             interferogram_files)
+#
+#
+# lats = np.linspace(89.5, -89.5, 359)
+# lons = np.linspace(179.5, -179.5, 719)
+# lats, lons = np.meshgrid(lats, lons)
+#
+# # Make a time series object
+# time_series = pet.dataAnalysis.surfaceDeformationAnalysis.surfaceDeformation3DTimeSeries(name="3d time series",
+#                                                                                          planet=planet,
+#                                                                                          campaign=campaign,
+#                                                                                          instrument=instrument)
+#
+# # Read the amplitudes, phases, and topographical errors
+# time_series.create_3d_time_series(interferograms=interferograms,
+#                                   spatial_points=np.asarray([lats.flatten(), lons.flatten()]).T)
+#
+# time_series.save(file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/time_series_3d_base")
 
 time_series = (
     pet.dataAnalysis.surfaceDeformationAnalysis.surfaceDeformation3DTimeSeries.from_file(
@@ -206,12 +208,12 @@ time_series = (
                   "files/time_series_3d_base"))
 
 # Define a projection
-projection = pet.biaxialProjections.biaxialCylindrical(name="biaxial cylindrical",
-                                                       folder_path="/home/user/Documents/GitHub/"
+projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", north_extent=-30, south_extent=-90,
+                                                              folder_path="/home/user/Documents/GitHub/"
                                                                    "Planetary-Exploration-Tool/figs/")
 
-time_series.visualize_time_series_amplitudes(projection=projection)
-time_series.visualize_time_series_phases(projection=projection)
+time_series.visualize_time_series_amplitudes(projection=projection, direction="east")
+time_series.visualize_time_series_phases(projection=projection, direction="east")
 
 fm.clear()
 

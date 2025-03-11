@@ -24,7 +24,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
     planet.doc = "target planet"
 
     campaign = pet.protocols.campaigns.orbiter()
-    campaign.doc = "campaign (must be an oribiter)"
+    campaign.doc = "campaign (must be an orbiter)"
 
     instrument = pet.protocols.instruments.inSAR()
     instrument.doc = "observation instrument"
@@ -46,7 +46,13 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
     @classmethod
     def from_file(cls, planet, instrument, campaign, deformation_map, file_name):
         """
-
+        Load the interferogram from an HDF5 file
+        :param planet: Planet object
+        :param instrument: Instrument object
+        :param campaign: Campaign object
+        :param deformation_map: Deformation map object
+        :param file_name: Name of the file to load
+        :return: Interferogram object
         """
 
         # Open the HDF5 file in read mode
@@ -55,14 +61,18 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         track2_da = datatree["track2"].to_dataset()["track2"]
         data = datatree["interferogram"]["los_displacements"]
 
+        # Create the track objects
         track1 = pet.dataAcquisition.track.from_data_array(planet=planet, campaign=campaign, instrument=instrument,
                                                            data=track1_da)
         track2 = pet.dataAcquisition.track.from_data_array(planet=planet, campaign=campaign, instrument=instrument,
                                                            data=track2_da)
+
+        # Create the interferogram object
         obj = cls(name="igram" + str(np.random.rand()),
                   planet=planet, instrument=instrument, campaign=campaign,
                   deformation_map=deformation_map, track1=track1,
                   track2=track2, baseline=data.attrs["baseline"])
+
         obj.data = data  # Restore computed result
 
         return obj
@@ -70,7 +80,13 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
     @classmethod
     def from_files(cls, planet, instrument, campaign, deformation_map, file_list):
         """
-
+        Load a list of interferograms from a list of HDF5 files
+        :param planet: Planet object
+        :param instrument: Instrument object
+        :param campaign: Campaign object
+        :param deformation_map: Deformation map object
+        :param file_list: List of files to load
+        :return: List of interferogram objects
         """
 
         # Load all the files
@@ -80,6 +96,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
     def save(self, file_name):
         """
         Save the track to an HDF5 file
+        :param file_name: Name of the file to save
         :return: Nothing returned
         """
 
@@ -91,6 +108,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         Create a xarray with the input data
         :param los_displacements: displacement values measured in the LOS
         :param psis: Flattened values
+        :return: Nothing returned
         """
 
         # Create the xarray datarray
@@ -327,7 +345,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         :param globe: cartopy globe
         :param ax: matplotlib ax
         :param return_fig: Whether to return fig, globe, ax
-        :return: Nothing returned
+        :return: fig, ax, globe if return_fig is True
         """
 
         if fig is None:

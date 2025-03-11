@@ -16,10 +16,10 @@ from shapely.geometry import Point
 import xarray as xr
 
 
-class SurfaceDeformation1DTimeSeries(
-    pet.component, family="pet.dataAnalysis.surfaceDeformationAnalysis.surfaceDeformation1DTimeSeries",
-    implements=pet.protocols.dataAnalysis.surfaceDeformationAnalysis):
-
+class SurfaceDeformation1DTimeSeries(pet.component,
+                                     family="pet.dataAnalysis.surfaceDeformationAnalysis."
+                                            "surfaceDeformation1DTimeSeries",
+                                     implements=pet.protocols.dataAnalysis.surfaceDeformationAnalysis):
     """
     Class that is able to create time series information from loaded interferograms
     """
@@ -28,7 +28,7 @@ class SurfaceDeformation1DTimeSeries(
     planet.doc = "target planet"
 
     campaign = pet.protocols.campaigns.orbiter()
-    campaign.doc = "campaign (must be an oribiter)"
+    campaign.doc = "campaign (must be an orbiter)"
 
     instrument = pet.protocols.instruments.inSAR()
     instrument.doc = "observation instrument"
@@ -38,29 +38,43 @@ class SurfaceDeformation1DTimeSeries(
     @classmethod
     def from_file(cls, planet, campaign, instrument, file_name):
         """
-
+        Load a track from an HDF5 file
+        :param planet: Planet object
+        :param campaign: Campaign object
+        :param instrument: Instrument object
+        :param file_name: Name of the file to load
+        :return: A track object
         """
 
         # Open the HDF5 file in read mode
         data = xr.open_dataset(filename_or_obj=file_name)
 
-        obj = cls(planet=planet, campaign=campaign, instrument=instrument)
+        # Create the object
+        obj = cls(name="time_series" + str(np.random.rand()), planet=planet, campaign=campaign, instrument=instrument)
+
         obj.data = data  # Restore computed result
+
         return obj
 
     @classmethod
     def from_files(cls, planet, campaign, instrument, file_list):
         """
-
+        Load a list of tracks from HDF5 files
+        :param planet: Planet object
+        :param campaign: Campaign object
+        :param instrument: Instrument object
+        :param file_list: List of file names to load
+        :return: A list of track objects
         """
 
         # Load all the files
-        return [cls.from_file(planet=planet, campaign=campaign, instrument=instrument, file_name=file)
-                for file in file_list]
+        return [cls.from_file(planet=planet, campaign=campaign, instrument=instrument,
+                              file_name=file) for file in file_list]
 
     def save(self, file_name):
         """
         Save the track to an HDF5 file
+        :param file_name: Name of the file to save
         :return: Nothing returned
         """
 
@@ -77,20 +91,23 @@ class SurfaceDeformation1DTimeSeries(
         :param phases: phases to be saved
         :param phase_uncertainties: phase uncertainties to be saved
         :param topography_corrections: topography corrections to be saved
+        :return: Nothing returned
         """
 
         # Create the xarray Dataset
         da = xr.DataArray(
-            data=amplitudes,
+            data=topography_corrections,
             dims=["points"],
             coords={
-                "amplitude_uncertainties": ("points", np.asarray(amplitude_uncertainties)),
+                "amplitudes": ("points", np.asarray(amplitudes)),
+                "amplitude_uncertainties":
+                    ("points", np.asarray(amplitude_uncertainties)),
                 "phases": ("points", np.asarray(phases)),
-                "phase_uncertainties": ("points", np.asarray(phase_uncertainties)),
-                "topography_corrections": ("points", np.asarray(topography_corrections)),
+                "phase_uncertainties":
+                    ("points", np.asarray(phase_uncertainties)),
                 "latitude": ("points", np.asarray([point[0] for point in geodetic_coordinates])),
                 "longitude": ("points", np.asarray([point[1] for point in geodetic_coordinates]))},
-            name="amplitudes",
+            name="topography_corrections",
             attrs=dict(
                 body_id=self.campaign.body_id,
             ),
@@ -100,11 +117,21 @@ class SurfaceDeformation1DTimeSeries(
         self.data = da
 
     def calculate_uncertainty(self, uncertainty_c, uncertainty_s, a, phase):
+        """
+        Calculate the uncertainty of the amplitude and phase
+        :param uncertainty_c: uncertainty of the c parameter
+        :param uncertainty_s: uncertainty of the s parameter
+        :param a: amplitude
+        :param phase: phase
+        :return: uncertainty of the amplitude, uncertainty of the phase
+        """
 
+        # Calculate the uncertainties
         sigma_a = np.sqrt((uncertainty_c * np.sin(phase) ** 2 - uncertainty_s * np.cos(phase) ** 2) /
                           (np.sin(phase) ** 4 - np.cos(phase) ** 4))
         sigma_phase = np.sqrt((-uncertainty_c * np.cos(phase) ** 2 + uncertainty_s * np.sin(phase) ** 2) /
                               (a ** 2 * (np.sin(phase) ** 4 - np.cos(phase) ** 4)))
+
         return sigma_a, sigma_phase
 
     def create_1d_time_series(self, interferograms, spatial_points, alpha=0.3):
@@ -112,6 +139,7 @@ class SurfaceDeformation1DTimeSeries(
         Return the amplitudes, phases, and topographic errors of a set of points in 1 look direction
         :param interferograms: interferograms to analyze, in 1 look direction
         :param spatial_points: points to do the inverse problem on
+        :param alpha: alpha parameter for the alpha shape
         :return: amplitudes, phases, topographic errors
         """
 
@@ -120,7 +148,7 @@ class SurfaceDeformation1DTimeSeries(
         g_matrices = {i: [] for i in range(len(spatial_points))}
 
         # Define the tidal cycle, and therefore the angular frequency
-        tidal_cycle = self.planet.tidal_cycle
+        tidal_cycle = self.planet.tidal_cycle.value
         omega = 2 * np.pi / tidal_cycle
 
         line_of_sight_vectors = [[] for _ in range(len(spatial_points))]
@@ -136,14 +164,32 @@ class SurfaceDeformation1DTimeSeries(
             longitudes = data_array["longitude"].values
             points = np.column_stack((latitudes, longitudes))
 
-            # Interpolate each desired variable
-            results = {var: [] for var in ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]}
+            # Create alpha shape (polygon)
+            polygon = alphashape.alphashape(points, alpha)
+
+            # Check which spatial points are inside the polygon
+            spatial_points_to_check = np.array([Point(point[0], point[1]) for point in spatial_points])
+            is_inside = np.array([polygon.contains(pt) for pt in spatial_points_to_check])
+
+            # Extract valid spatial points
+            valid_points = spatial_points[is_inside]
+
+            # Initialize results dictionary
+            results = {var: np.full(len(spatial_points), np.nan) for var in
+                       ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]}
 
             # Interpolate each desired variable
             for var in ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]:
-                values = data_array[var].values
-                interpolated_value = griddata(points=points, values=values, xi=spatial_points, method="cubic")
-                results[var].extend(interpolated_value)
+                if var == "los_displacements":
+                    values = data_array.values
+                else:
+                    values = data_array[var].values
+
+                # Perform interpolation only for valid points
+                interpolated_values = griddata(points=points, values=values, xi=valid_points, method="cubic")
+
+                # Assign interpolated values back to the corresponding positions
+                results[var][is_inside] = interpolated_values
 
             # Extract interpolated values
             sat_times = np.asarray(results["sat_pos_time"])
@@ -156,14 +202,11 @@ class SurfaceDeformation1DTimeSeries(
             psis_interps = np.asarray(results["psi"])
             psis_interps = psis_interps * data_array.attrs["baseline"]
             los_displacement_interps_with_noise = (los_displacement_interps +
-                                                   psis_interps * self.planet.topography_uncertainty)
-
-            polygon = alphashape.alphashape(points, alpha)
-            spatial_points_to_check = [Point(point[0], point[1]) for point in spatial_points]
-            is_inside = polygon.contains(spatial_points_to_check)
+                                                   psis_interps * self.planet.topography_uncertainty.value)
 
             # Get the satellite and surface positions
             satellite_positions, satellite_velocities = self.campaign.get_states(times=sat_times)
+            satellite_positions = np.asarray([[x.value, y.value, z.value] for x, y, z in satellite_positions])
             surface_positions = np.asarray([x_interps, y_interps, z_interps]).T
 
             # Calculate vectors from satellite to point and the satellite's direction
@@ -202,6 +245,7 @@ class SurfaceDeformation1DTimeSeries(
 
         for i in tqdm(range(len(spatial_points)), desc="Calculating inverse problems..."):
 
+            # Check if there is exactly one line of sight vector
             if len(line_of_sight_vectors[i]) < 1 or len(line_of_sight_vectors[i]) > 1:
                 amplitudes.append(np.nan)
                 amplitude_uncertainties.append(np.nan)
@@ -220,23 +264,43 @@ class SurfaceDeformation1DTimeSeries(
                 # Calculate amplitudes and phases
                 covariance_matrix = np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_ds[i]) @ g_matrices[i])
                 a = np.sqrt(c ** 2 + s ** 2)
-                phase = np.arctan2(s, c)
-                main_diagonal = np.diag(covariance_matrix).tolist()
+
+                # If a is negative, flip the sign and add pi to the phase
+                if a < 0:
+                    a = -a
+                    phase = np.arctan2(c, s) + np.pi
+                else:
+                    phase = np.arctan2(c, s)
+
+                # Append the results
                 amplitudes.append(a)
                 phases.append(phase)
+                topography_corrections.append(z)
+
+                # Calculate uncertainties
+                main_diagonal = np.diag(covariance_matrix).tolist()
                 uncertainty_a1, uncertainty_phase1 = self.calculate_uncertainty(uncertainty_c=main_diagonal[0],
                                                                                 uncertainty_s=main_diagonal[1],
                                                                                 a=a, phase=phase)
+
+                # Append the uncertainties
                 amplitude_uncertainties.append(uncertainty_a1)
                 phase_uncertainties.append(uncertainty_phase1)
-                topography_corrections.append(z)
 
-        # Return the results
-        return amplitudes, amplitude_uncertainties, phases, phase_uncertainties, topography_corrections
+        # Create the data array
+        self.create_data_array(geodetic_coordinates=spatial_points, amplitudes=amplitudes,
+                               amplitude_uncertainties=amplitude_uncertainties, phases=phases,
+                               phase_uncertainties=phase_uncertainties, topography_corrections=topography_corrections)
 
     def visualize_time_series_amplitudes(self, projection, fig=None, globe=None, ax=None, return_fig=False):
         """
-
+        Visualize the amplitudes of the time series
+        :param projection: Cartopy projection
+        :param fig: matplotlib figure
+        :param globe: cartopy globe
+        :param ax: matplotlib ax
+        :param return_fig: Whether to return fig, globe, ax
+        :return: fig, ax, globe if return_fig is True
         """
 
         if fig is None:
@@ -244,7 +308,7 @@ class SurfaceDeformation1DTimeSeries(
             fig, ax, globe = projection.proj(planet=self.planet)
 
         # Load the values to plot
-        amplitudes = self.data.values
+        amplitudes = self.data["amplitudes"].values
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
 
@@ -266,12 +330,18 @@ class SurfaceDeformation1DTimeSeries(
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/' + 'time_series_amplitudes_' +
-                          self.deformation_map.pyre_name + '_' + str(self.campaign.body_id) + '.png', format='png',
+                    str(self.campaign.body_id) + '.png', format='png',
                     dpi=500)
 
     def visualize_time_series_phases(self, projection, fig=None, globe=None, ax=None, return_fig=False):
         """
-
+        Visualize the phases of the time series
+        :param projection: Cartopy projection
+        :param fig: matplotlib figure
+        :param globe: cartopy globe
+        :param ax: matplotlib ax
+        :param return_fig: Whether to return fig, globe, ax
+        :return: fig, ax, globe if return_fig is True
         """
 
         if fig is None:
@@ -301,7 +371,7 @@ class SurfaceDeformation1DTimeSeries(
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/' + 'time_series_phases_' +
-                          self.deformation_map.pyre_name + '_' + str(self.campaign.body_id) + '.png', format='png',
+                    str(self.campaign.body_id) + '.png', format='png',
                     dpi=500)
 
 # end of file

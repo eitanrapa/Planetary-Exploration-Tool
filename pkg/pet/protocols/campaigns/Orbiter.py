@@ -10,7 +10,7 @@ import pet
 
 class Orbiter(pet.protocol, family="pet.campaigns"):
     """
-    The abstract specification for a campaign
+    The abstract specification for orbiting campaigns
     """
 
     @pet.provides
