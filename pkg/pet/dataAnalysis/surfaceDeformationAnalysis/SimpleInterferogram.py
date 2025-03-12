@@ -38,8 +38,8 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
     track2 = pet.protocols.dataAcquisition()
     track2.doc = "second track"
 
-    baseline = pet.properties.dimensional()
-    baseline.doc = "baseline between the two tracks"
+    baseline = pet.properties.float()
+    baseline.doc = "baseline between the two tracks [m]"
 
     data = None
 
@@ -101,7 +101,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         """
 
         # Open HDF5 file
-        self.data.to_netcdf(file_name)
+        self.data.to_netcdf(file_name, engine="netcdf4")
 
     def create_data_array(self, los_displacements, psis):
         """
@@ -130,7 +130,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
             attrs=dict(
                 deformation_map=self.deformation_map.pyre_name,
                 body_id=self.campaign.body_id,
-                baseline=self.baseline.value,
+                baseline=self.baseline,
                 start_time1=self.track1.start_time,
                 end_time1=self.track1.end_time,
                 start_time2=self.track2.start_time,
@@ -158,8 +158,6 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
 
         # Calculate the satellite intersect and height with the shape
         intersects, satellite_heights = self.planet.get_sub_obs_points(times=time, campaign=self.campaign)
-        intersects = np.asarray([[x.value, y.value, z.value] for x, y, z in intersects])
-        satellite_heights = np.asarray([height.value for height in satellite_heights])
 
         # Calculate the distance between center and satellite intersects
         satellite_radii = np.asarray([np.linalg.norm(intersect - [0, 0, 0]) for intersect in intersects])
@@ -191,9 +189,6 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
 
         # Get planet axes
         a, b, c = self.planet.get_axes()
-        a = a.value
-        b = b.value
-        c = c.value
 
         # Calculate vectors from the ground positions to the satellite
         positions = np.asarray(positions)
@@ -239,8 +234,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         print("Getting satellite positions...", file=sys.stderr)
 
         # Get satellite positions and velocities
-        satellite_positions, sat_velocities = self.campaign.get_states(times=self.track1.data["sat_pos_time"].values)
-        satellite_positions = np.asarray([[x.value, y.value, z.value] for x, y, z in satellite_positions])
+        satellite_positions, _ = self.campaign.get_states(times=self.track1.data["sat_pos_time"].values)
 
         print("Getting flattened points on the ellipsoid...", file=sys.stderr)
 
@@ -307,7 +301,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         psis = psis * baseline
 
         # Calculate the phases using the LOS displacements, baseline, geodetic heights, distances, angles
-        phases = 4 * np.pi * (1 / self.instrument.wavelength.value) * (los_displacements - (psis * heights))
+        phases = 4 * np.pi * (1 / self.instrument.wavelength) * (los_displacements - (psis * heights))
 
         # Wrap interferogram
         phases = np.fmod(phases, 2 * np.pi)

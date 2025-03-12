@@ -56,7 +56,7 @@ deformation_map = pet.natureSimulations.geophysicalModel.tidalDeformationMap(nam
 #                                                                                 instrument=instrument, planet=planet,
 #                                                                                 deformation_map=deformation_map,
 #                                                                                 track1=track1, track2=track2,
-#                                                                                 campaign=campaign, baseline="10*m")
+#                                                                                 campaign=campaign, baseline=10)
 # # Calculate interferogram
 # interferogram.calculate_igram()
 #

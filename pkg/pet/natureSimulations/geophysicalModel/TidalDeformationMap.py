@@ -119,7 +119,7 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
 
         # Define the sine function
         def sine_func(t, a, phi):
-            return a * np.sin((2 * np.pi) / self.planet.tidal_cycle.value * t + phi)
+            return a * np.sin((2 * np.pi) / self.planet.tidal_cycle * t + phi)
 
         a_fits = []
         phi_fits = []
@@ -128,21 +128,21 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
 
             # Interpolate the east cube
             interpolator = RegularGridInterpolator(points=(longitudes, latitudes,
-                                                           times * self.planet.tidal_cycle.value),
+                                                           times * self.planet.tidal_cycle),
                                                    values=east_cube, method='linear', bounds_error=False,
                                                    fill_value=None)
         elif direction == "north":
 
             # Interpolate the north cube
             interpolator = RegularGridInterpolator(points=(longitudes, latitudes,
-                                                           times * self.planet.tidal_cycle.value),
+                                                           times * self.planet.tidal_cycle),
                                                    values=north_cube, method='linear', bounds_error=False,
                                                    fill_value=None)
         elif direction == "up":
 
             # Interpolate the up cube
             interpolator = RegularGridInterpolator(points=(longitudes, latitudes,
-                                                           times * self.planet.tidal_cycle.value),
+                                                           times * self.planet.tidal_cycle),
                                                    values=up_cube, method='linear', bounds_error=False,
                                                    fill_value=None)
 
@@ -152,7 +152,7 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
         for point in tqdm(spatial_points, "Interpolating points, fitting curves..."):
 
             # Create an array of time values from 0 to the tidal cycle
-            time_values = np.linspace(0, self.planet.tidal_cycle.value, len(times))
+            time_values = np.linspace(0, self.planet.tidal_cycle, len(times))
 
             # Extract the time series for the spatial point, convert longitude to 0 - 360 forma
             time_series = interpolator((point[1] % 360, point[0], time_values))
