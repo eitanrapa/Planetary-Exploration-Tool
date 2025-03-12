@@ -50,8 +50,8 @@ class Nightingale5to1(pet.component, family="pet.campaigns.orbiter.nightingale5t
                                     abcorr="None", obs=self.body_id)
 
         # Separate positions and velocities, convert to meters
-        positions = np.asarray([i * pet.units.length.kilometer for i in np.asarray(states[0])[:, :3]])
-        velocities = np.asarray([i * pet.units.length.kilometer / pet.units.SI.s for i in np.asarray(states[0])[:, 3:6]])
+        positions = np.asanyarray(states[0])[:, :3] * 1e3
+        velocities = np.asanyarray(states[0])[:, 3:6] * 1e3
 
         # Return positions and velocities
         return positions, velocities

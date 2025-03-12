@@ -29,8 +29,8 @@ times = campaign.get_five_tracks()
 
 # # First track
 # track = pet.dataAcquisition.track(name="track1", start_time=times[0], end_time=times[1], planet=planet,
-#                                   campaign=campaign, instrument=instrument, spatial_resolution="2*km",
-#                                   temporal_resolution="1*minute")
+#                                   campaign=campaign, instrument=instrument, spatial_resolution=2000,
+#                                   temporal_resolution=60)
 #
 # # Calculate the positions
 # track.calculate_ground_swath()
@@ -40,8 +40,8 @@ times = campaign.get_five_tracks()
 
 # # Second track
 # track = pet.dataAcquisition.track(name="track2", start_time=times[1], end_time=times[2], planet=planet,
-#                                   campaign=campaign, instrument=instrument,  spatial_resolution="2*km",
-#                                   temporal_resolution="1*minute")
+#                                   campaign=campaign, instrument=instrument, spatial_resolution=2000,
+# #                                   temporal_resolution=60)
 #
 # # Calculate the positions
 # track.calculate_ground_swath()
@@ -51,8 +51,8 @@ times = campaign.get_five_tracks()
 
 # Third track
 # track = pet.dataAcquisition.track(name="track3", start_time=times[2], end_time=times[3], planet=planet,
-#                                   campaign=campaign, instrument=instrument,  spatial_resolution="2*km",
-#                                   temporal_resolution="1*minute")
+#                                   campaign=campaign, instrument=instrument, spatial_resolution=2000,
+# #                                   temporal_resolution=60)
 #
 # # Calculate the positions
 # track.calculate_ground_swath()
@@ -62,8 +62,8 @@ times = campaign.get_five_tracks()
 #
 # Fourth track
 # track = pet.dataAcquisition.track(name="track4", start_time=times[3], end_time=times[4], planet=planet,
-#                                   campaign=campaign, instrument=instrument,  spatial_resolution="2*km",
-#                                   temporal_resolution="1*minute")
+#                                   campaign=campaign, instrument=instrument, spatial_resolution=2000,
+# #                                   temporal_resolution=60)
 #
 # # Calculate the positions
 # track.calculate_ground_swath()
@@ -73,8 +73,8 @@ times = campaign.get_five_tracks()
 #
 # Fifth track
 # track = pet.dataAcquisition.track(name="track5", start_time=times[4], end_time=times[5], planet=planet,
-#                                   campaign=campaign, instrument=instrument,  spatial_resolution="2*km",
-#                                   temporal_resolution="1*minute")
+#                                   campaign=campaign, instrument=instrument, spatial_resolution=2000,
+# #                                   temporal_resolution=60)
 #
 # # Calculate the positions
 # track.calculate_ground_swath()

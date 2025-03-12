@@ -38,13 +38,13 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
     instrument = pet.protocols.instruments.inSAR()
     instrument.doc = "observation instrument"
 
-    temporal_resolution = pet.properties.dimensional()
-    temporal_resolution.default = "10*s"
-    temporal_resolution.doc = "temporal resolution of orbit"
+    temporal_resolution = pet.properties.float()
+    temporal_resolution.default = 10
+    temporal_resolution.doc = "temporal resolution of orbit [s]"
 
-    spatial_resolution = pet.properties.dimensional()
-    spatial_resolution.default = "200*m"
-    spatial_resolution.doc = "spatial resolution of ground track"
+    spatial_resolution = pet.properties.float()
+    spatial_resolution.default = 200
+    spatial_resolution.doc = "spatial resolution of ground track [m]"
 
     data = None
 
@@ -124,7 +124,7 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         """
 
         # Open HDF5 file
-        self.data.to_netcdf(file_name)
+        self.data.to_netcdf(file_name, engine="netcdf4")
 
     def create_data_array(self, cartesian_coordinates, geodetic_coordinates, look_angles, times):
         """
@@ -143,19 +143,19 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
             coords={
                 "sat_pos_time": ("points", times),
                 "time": ("points", times),
-                "x": ("points", np.asarray([point[0].value for point in cartesian_coordinates])),
-                "y": ("points", np.asarray([point[1].value for point in cartesian_coordinates])),
-                "z": ("points", np.asarray([point[2].value for point in cartesian_coordinates])),
+                "x": ("points", np.asarray([point[0] for point in cartesian_coordinates])),
+                "y": ("points", np.asarray([point[1] for point in cartesian_coordinates])),
+                "z": ("points", np.asarray([point[2] for point in cartesian_coordinates])),
                 "latitude": ("points", np.asarray([point[0] for point in geodetic_coordinates])),
                 "longitude": ("points", np.asarray([point[1] for point in geodetic_coordinates])),
-                "height": ("points", np.asarray([point[2].value for point in geodetic_coordinates]))},
+                "height": ("points", np.asarray([point[2] for point in geodetic_coordinates]))},
             name="look_angles",
             attrs=dict(
                 body_id=self.campaign.body_id,
                 start_time=self.start_time,
                 end_time=self.end_time,
-                temporal_resolution=self.temporal_resolution.value,
-                spatial_resolution=self.spatial_resolution.value
+                temporal_resolution=self.temporal_resolution,
+                spatial_resolution=self.spatial_resolution
             ),
         )
 
@@ -201,24 +201,19 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         """
 
         # Get the time space
-        time_space = np.arange(self.start_time, self.end_time + self.temporal_resolution.value,
-                               self.temporal_resolution.value)
+        time_space = np.arange(self.start_time, self.end_time + self.temporal_resolution,
+                               self.temporal_resolution)
 
         # Get planet axes
         a, b, c = self.planet.get_axes()
-        a = a.value
-        b = b.value
-        c = c.value
 
         # Get the number of rays to intercept with DSK in accordance with spatial resolution
-        num_theta = int((2 * np.pi / self.spatial_resolution.value) * np.average((a, b, c)))
+        num_theta = int((2 * np.pi / self.spatial_resolution) * np.average((a, b, c)))
 
         print("Getting satellite positions...", file=sys.stderr)
 
         # Get positions and velocities of the satellite for the observation times
         satellite_positions, satellite_velocities = self.campaign.get_states(times=time_space)
-        satellite_positions = np.asarray([[x.value, y.value, z.value] for x, y, z in satellite_positions])
-        satellite_velocities = np.asarray([[x.value, y.value, z.value] for x, y, z in satellite_velocities])
 
         print("Calculating SPICE planes...", file=sys.stderr)
 
@@ -248,7 +243,6 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
 
             # Get the intersects with the planet DSK
             intersects = self.planet.get_surface_intersects(vectors=vectors)
-            intersects = np.asarray([[x.value, y.value, z.value] for x, y, z in intersects])
 
             # Make groundTarget objects with the intersects
             swath_beams.append([[intersect[0], intersect[1], intersect[2]] for intersect in intersects])
@@ -281,8 +275,7 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
             swath_beams[i] = [swath_beams[i][index] for index in indices]
             look_angles[i] = [look_angles[i][index] for index in indices]
 
-        cartesian_positions = np.asarray([[coord[0]*pet.units.SI.m, coord[1]*pet.units.SI.m, coord[2]*pet.units.SI.m]
-                                          for sublist in swath_beams for coord in sublist])
+        cartesian_positions = np.asanyarray([coord for sublist in swath_beams for coord in sublist])
         flat_angles = np.asarray([angle for sublist in look_angles for angle in sublist])
         times = [[time] * len(beams) for time, beams in zip(time_space, swath_beams)]
         flat_times = np.asarray([time for sublist in times for time in sublist])
@@ -301,9 +294,6 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
 
         # Get planet axes
         a, b, c = self.planet.get_axes()
-        a = a.value
-        b = b.value
-        c = c.value
 
         # Get the limb ellipses from satellite positions
         limb_ellipses = spice.edlimb_vector(a=a, b=b, c=c, viewpt=satellite_positions)
@@ -389,8 +379,6 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
 
         # Calculate the satellite intersects and heights with the shape
         intersects, satellite_heights = self.planet.get_sub_obs_points(times=times, campaign=self.campaign)
-        intersects = np.asarray([[x.value, y.value, z.value] for x, y, z in intersects])
-        satellite_heights = np.asarray([height.value for height in satellite_heights])
 
         # Calculate the distance between center and satellite intersects
         satellite_radii = np.asarray([np.linalg.norm(intersect - [0, 0, 0]) for intersect in intersects])

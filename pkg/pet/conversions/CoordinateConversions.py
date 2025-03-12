@@ -15,14 +15,14 @@ class CoordinateConversions(pet.component, family="pet.conversions.coordinateCon
     Class that encapsulates conversions between Cartesian and Geodetic coordinates
     """
 
-    a = pet.properties.dimensional()
-    a.doc = "first semi-axis"
+    a = pet.properties.float()
+    a.doc = "first semi-axis [m]"
 
-    b = pet.properties.dimensional()
-    b.doc = "second semi-axis"
+    b = pet.properties.float()
+    b.doc = "second semi-axis [m]"
 
-    c = pet.properties.dimensional()
-    c.doc = "third semi-axis"
+    c = pet.properties.float()
+    c.doc = "third semi-axis [m]"
 
     def _cartesian(self, geodetic_coordinates):
         """
@@ -32,7 +32,7 @@ class CoordinateConversions(pet.component, family="pet.conversions.coordinateCon
         """
 
         # Define a TriaxialEllipsoid struct
-        te = pet.ext.pet.TriaxialEllipsoid(a=self.a.value, b=self.b.value, c=self.c.value)
+        te = pet.ext.pet.TriaxialEllipsoid(a=self.a, b=self.b, c=self.c)
 
         # Create empty list of coordinates
         cartesian_coordinates = []
@@ -42,7 +42,7 @@ class CoordinateConversions(pet.component, family="pet.conversions.coordinateCon
             # Define a GeodeticPoint struct
             gp = pet.ext.pet.GeodeticPoint(latitude=geodetic_coordinates[i, 0],
                                            longitude=geodetic_coordinates[i, 1],
-                                           height=geodetic_coordinates[i, 2].value)
+                                           height=geodetic_coordinates[i, 2])
 
             # Define an empty CartesianPoint struct to be modified
             cp = pet.ext.pet.CartesianPoint(x=0, y=0, z=0)
@@ -51,7 +51,7 @@ class CoordinateConversions(pet.component, family="pet.conversions.coordinateCon
             pet.ext.pet.cartesian(te=te, gp=gp, cp=cp)
 
             # Append the new Cartesian coordinates to list
-            cartesian_coordinates.append([cp.x * pet.units.SI.m, cp.y * pet.units.SI.m, cp.z * pet.units.SI.m])
+            cartesian_coordinates.append([cp.x, cp.y, cp.z])
 
         return np.asarray(cartesian_coordinates)
 
@@ -87,7 +87,7 @@ class CoordinateConversions(pet.component, family="pet.conversions.coordinateCon
         """
 
         # Define a TriaxialEllipsoid struct
-        te = pet.ext.pet.TriaxialEllipsoid(a=self.a.value, b=self.b.value, c=self.c.value)
+        te = pet.ext.pet.TriaxialEllipsoid(a=self.a, b=self.b, c=self.c)
 
         # Create an empty list of coordinates
         geodetic_coordinates = []
@@ -97,14 +97,14 @@ class CoordinateConversions(pet.component, family="pet.conversions.coordinateCon
             gp = pet.ext.pet.GeodeticPoint(latitude=0, longitude=0, height=0)
 
             # Define a CartesianPoint struct
-            cp = pet.ext.pet.CartesianPoint(x=cartesian_coordinates[i, 0].value, y=cartesian_coordinates[i, 1].value,
-                                            z=cartesian_coordinates[i, 2].value)
+            cp = pet.ext.pet.CartesianPoint(x=cartesian_coordinates[i, 0], y=cartesian_coordinates[i, 1],
+                                            z=cartesian_coordinates[i, 2])
 
             # Call the C++ code and get the number of iterations
             iterations = pet.ext.pet.geodetic(te=te, cp=cp, gp=gp, tol=tol)
 
             # Append the new geodetic coordinates to list
-            geodetic_coordinates.append([gp.latitude, gp.longitude, gp.height * pet.units.SI.m])
+            geodetic_coordinates.append([gp.latitude, gp.longitude, gp.height])
 
         return np.asarray(geodetic_coordinates)
 

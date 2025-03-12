@@ -8,10 +8,10 @@
 import pet
 
 # Create a conversions object
-coordinate_conversions = pet.conversions.coordinateConversions(name="conversions", a="1*km", b="1*km", c="1*km")
+coordinate_conversions = pet.conversions.coordinateConversions(name="conversions", a=1, b=1, c=1)
 
 # Make some cartesian coordinates
-cartesian_coordinates = [10*pet.units.SI.m, 10*pet.units.SI.m, 10*pet.units.SI.m]
+cartesian_coordinates = [10, 10, 10]
 
 # Convert some coordinates to geodetic
 geodetic_coordinates = coordinate_conversions.geodetic(cartesian_coordinates=cartesian_coordinates)
@@ -23,8 +23,8 @@ print(cartesian_coordinates[0], cartesian_coordinates[1], cartesian_coordinates[
       cartesian_coordinates_converted[0], cartesian_coordinates_converted[1],
       cartesian_coordinates_converted[2])
 
-cartesian_coordinates = [[10*pet.units.SI.m, 10*pet.units.SI.m, 10*pet.units.SI.m],
-                         [5*pet.units.SI.m, 5*pet.units.SI.m, 5*pet.units.SI.m]]
+cartesian_coordinates = [[10, 10, 10],
+                         [5, 5, 5]]
 
 # Convert some coordinates to geodetic
 geodetic_coordinates = coordinate_conversions.geodetic(cartesian_coordinates=cartesian_coordinates)

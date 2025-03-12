@@ -14,21 +14,21 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     Defines the Nightingale ChirpChirp instrument
     """
 
-    wavelength = pet.properties.dimensional()
-    wavelength.default = "13*cm"
-    wavelength.doc = "radar instrument wavelength"
+    wavelength = pet.properties.float()
+    wavelength.default = 0.13
+    wavelength.doc = "radar instrument wavelength [m]"
 
     look_angle = pet.properties.float()
     look_angle.default = 25
     look_angle.doc = "look angle of the radar instrument"
 
-    antenna_elevation_width = pet.properties.dimensional()
-    antenna_elevation_width.default = "0.5*m"
-    antenna_elevation_width.doc = "elevation width of the antenna"
+    antenna_elevation_width = pet.properties.float()
+    antenna_elevation_width.default = 0.5
+    antenna_elevation_width.doc = "elevation width of the antenna [m]"
 
     look_direction = pet.properties.str()
     look_direction.default = "right"
-    look_direction.doc = "look direction of the radar instrument"
+    look_direction.doc = "look direction of the radar instrument (right or left)"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

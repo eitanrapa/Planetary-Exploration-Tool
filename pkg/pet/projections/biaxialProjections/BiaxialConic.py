@@ -77,8 +77,7 @@ class BiaxialConic(pet.component, family="pet.projections.biaxialProjections.bia
         planet_axes = planet.get_axes()
 
         # Define Enceladus globe
-        img_globe = ccrs.Globe(semimajor_axis=planet_axes[0].value, semiminor_axis=planet_axes[2].value,
-                               ellipse=None)
+        img_globe = ccrs.Globe(semimajor_axis=planet_axes[0], semiminor_axis=planet_axes[2], ellipse=None)
 
         # Create a circular map using Cylindrical projection
         fig, ax = plt.subplots(subplot_kw={

@@ -43,30 +43,30 @@ deformation_map = pet.natureSimulations.geophysicalModel.tidalDeformationMap(nam
                                                                                                     "_Results.hdf5",
                                                                              planet=planet)
 
-# path = "/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/"
-# interferogram_files = [path + 'igram_base_{}'.format(i) for i in range(10)]
-# interferograms = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram.from_files(instrument=instrument,
-#                                                                                             planet=planet,
-#                                                                                             deformation_map=
-#                                                                                             deformation_map,
-#                                                                                             campaign=campaign,
-#                                                                                             file_list=
-#                                                                                             interferogram_files)
+path = "/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/"
+interferogram_files = [path + 'igram_base_{}'.format(i) for i in range(10)]
+interferograms = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram.from_files(instrument=instrument,
+                                                                                            planet=planet,
+                                                                                            deformation_map=
+                                                                                            deformation_map,
+                                                                                            campaign=campaign,
+                                                                                            file_list=
+                                                                                            interferogram_files)
 
-# lats = np.linspace(89.5, -89.5, 359)
-# lons = np.linspace(179.5, -179.5, 719)
-# lats, lons = np.meshgrid(lats, lons)
-#
-# # Make a time series object
-# time_series = pet.dataAnalysis.surfaceDeformationAnalysis.surfaceDeformation1DTimeSeries(name="1d time series",
-#                                                                                          planet=planet,
-#                                                                                          campaign=campaign,
-#                                                                                          instrument=instrument)
-#
-# # Read the amplitudes, phases, and topographical errors
-# time_series.create_1d_time_series(interferograms=interferograms,
-#                                   spatial_points=np.asarray([lats.flatten(), lons.flatten()]).T)
-#
+lats = np.linspace(89.5, -89.5, 359)
+lons = np.linspace(179.5, -179.5, 719)
+lats, lons = np.meshgrid(lats, lons)
+
+# Make a time series object
+time_series = pet.dataAnalysis.surfaceDeformationAnalysis.surfaceDeformation1DTimeSeries(name="1d time series",
+                                                                                         planet=planet,
+                                                                                         campaign=campaign,
+                                                                                         instrument=instrument)
+
+# Read the amplitudes, phases, and topographical errors
+time_series.create_1d_time_series(interferograms=interferograms,
+                                  spatial_points=np.asarray([lats.flatten(), lons.flatten()]).T, processors=2)
+
 # time_series.save(file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/time_series_1d_base")
 
 time_series = (

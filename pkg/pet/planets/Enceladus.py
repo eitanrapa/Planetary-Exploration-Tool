@@ -26,13 +26,13 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     reference_id.default = "IAU_ENCELADUS"
     reference_id.doc = "The NAIF ID of the reference frame of Enceladus"
 
-    tidal_cycle = pet.properties.dimensional()
-    tidal_cycle.default = "118386.8352*s"
-    tidal_cycle.doc = "The tidal cycle of Enceladus"
+    tidal_cycle = pet.properties.float()
+    tidal_cycle.default = 118386.8352
+    tidal_cycle.doc = "The tidal cycle of Enceladus [s]"
 
-    topography_uncertainty = pet.properties.dimensional()
-    topography_uncertainty.default = "300*m"
-    topography_uncertainty.doc = "The uncertainty in the topography of Enceladus"
+    topography_uncertainty = pet.properties.float()
+    topography_uncertainty.default = 300
+    topography_uncertainty.doc = "The uncertainty in the topography of Enceladus [m]"
 
     @pet.export
     def get_axes(self):
@@ -45,9 +45,9 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         a, b, c = spice.bodvcd(bodyid=int(self.body_id), item="RADII")
 
         # Convert to meters
-        a = a * pet.units.length.kilometer
-        b = b * pet.units.length.kilometer
-        c = c * pet.units.length.kilometer
+        a = a * 1e3
+        b = b * 1e3
+        c = c * 1e3
 
         # Return the axes
         return np.asarray([a, b, c])
@@ -71,7 +71,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
                       vector in vectors]
 
         # Convert to meters
-        intersects = np.asarray([intersect * pet.units.length.km for intersect in intersects])
+        intersects = np.asanyarray(intersects) * 1e3
 
         # Return the intersects
         return intersects
@@ -91,9 +91,8 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
                                                           abcorr="None", obsrvr=str(campaign.body_id))[::2]
 
         # Convert to meters
-        sub_points = np.asarray([sub_point * pet.units.length.kilometer for sub_point in sub_points])
-        distances = spice.vnorm_vector(v1=surface_vectors)
-        distances = np.asarray([distance * pet.units.length.kilometer for distance in distances])
+        sub_points = np.asanyarray(sub_points) * 1e3
+        distances = np.asanyarray(spice.vnorm_vector(v1=surface_vectors)) * 1e3
 
         # Return sub-observation points and distances of vectors
         return sub_points, distances
@@ -115,9 +114,9 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         dla = spice.dlabfs(handle=handle)
         n_vert = spice.dskb02(handle=handle, dladsc=dla)[0]
         vertices = spice.dskv02(handle=handle, dladsc=dla, start=1, room=n_vert)
-        x = np.asarray([vertex * pet.units.length.kilometer for vertex in vertices[:, 0]])
-        y = np.asarray([vertex * pet.units.length.kilometer for vertex in vertices[:, 1]])
-        z = np.asarray([vertex * pet.units.length.kilometer for vertex in vertices[:, 2]])
+        x = vertices[:, 0] * 1e3  # Convert to meters
+        y = vertices[:, 1] * 1e3  # Convert to meters
+        z = vertices[:, 2] * 1e3  # Convert to meters
 
         # Get planet axes
         a, b, c = self.get_axes()
@@ -138,8 +137,6 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
                                geodetic_coordinates if projection.south_extent < lat < projection.north_extent and
                                projection.west_extent < long < projection.east_extent]
         longitudes, latitudes, heights = zip(*trimmed_coordinates)
-
-        heights = [height.value for height in heights]
 
         # Make a grid to down-sample the topographical map for visualization
         n = 1000

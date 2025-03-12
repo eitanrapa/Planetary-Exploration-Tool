@@ -77,7 +77,7 @@ class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
         """
 
         # Open HDF5 file
-        self.data.to_netcdf(file_name)
+        self.data.to_netcdf(file_name, engine="netcdf4")
 
     def create_data_array(self, geodetic_coordinates, amplitudes, amplitude_uncertainties,
                           phases, phase_uncertainties, topography_corrections):
@@ -164,7 +164,7 @@ class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
         g_matrices = {i: [] for i in range(len(spatial_points))}
 
         # Define the tidal cycle, and therefore the angular frequency
-        tidal_cycle = self.planet.tidal_cycle.value
+        tidal_cycle = self.planet.tidal_cycle
         omega = 2 * np.pi / tidal_cycle
 
         # Create a conversion object
@@ -221,11 +221,10 @@ class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
             psis_interps = np.asarray(results["psi"])
             psis_interps = psis_interps * data_array.attrs["baseline"]
             los_displacement_interps_with_noise = (los_displacement_interps +
-                                                   psis_interps * self.planet.topography_uncertainty.value)
+                                                   psis_interps * self.planet.topography_uncertainty)
 
             # Get the satellite and surface positions
-            satellite_positions, satellite_velocities = self.campaign.get_states(times=sat_times)
-            satellite_positions = np.asarray([[x.value, y.value, z.value] for x, y, z in satellite_positions])
+            satellite_positions, _ = self.campaign.get_states(times=sat_times)
             surface_positions = np.asarray([x_interps, y_interps, z_interps]).T
 
             # Calculate vectors from satellite to point and the satellite's direction
