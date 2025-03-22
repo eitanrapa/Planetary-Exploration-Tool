@@ -406,11 +406,8 @@ class SurfaceDeformation1DTimeSeries(pet.component,
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
 
-        # Make the colormap cyclical
-        cm = plt.cm.get_cmap('hsv')
-
         # Plot the amplitudes
-        im = ax.scatter(longitudes, latitudes, c=amplitudes, cmap=cm, transform=ccrs.PlateCarree(globe=globe))
+        im = ax.scatter(longitudes, latitudes, c=amplitudes, transform=ccrs.PlateCarree(globe=globe))
 
         # return fig, ax, globe if necessary
         if return_fig:
@@ -447,11 +444,8 @@ class SurfaceDeformation1DTimeSeries(pet.component,
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
 
-        # Make the colormap cyclical
-        cm = plt.cm.get_cmap('hsv')
-
         # Plot the amplitudes
-        im = ax.scatter(longitudes, latitudes, c=phases, cmap=cm, transform=ccrs.PlateCarree(globe=globe))
+        im = ax.scatter(longitudes, latitudes, c=phases, transform=ccrs.PlateCarree(globe=globe))
 
         # return fig, ax, globe if necessary
         if return_fig:
