@@ -208,7 +208,8 @@ time_series = (
                   "files/time_series_3d_base"))
 
 # Define a projection
-projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", north_extent=-30, south_extent=-90,
+projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", north_extent=-30,
+                                                              central_latitude=-90,
                                                               folder_path="/home/user/Documents/GitHub/"
                                                                    "Planetary-Exploration-Tool/figs/")
 

@@ -19,7 +19,8 @@ fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tp
 planet = pet.planets.enceladus(name="enceladus")
 
 # Define a projection
-projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", north_extent=-30, south_extent=-90,
+projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", north_extent=-30,
+                                                              central_latitude=-90,
                                                               folder_path="/home/user/Documents/GitHub/"
                                                                           "Planetary-Exploration-Tool/figs/")
 
