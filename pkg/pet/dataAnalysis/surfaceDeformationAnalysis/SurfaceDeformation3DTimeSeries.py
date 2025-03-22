@@ -403,7 +403,7 @@ class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
         plt.title('Displacement amplitudes', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/' + 'time_series_amplitudes_' +
+        plt.savefig(fname=projection.folder_path + '/' + 'time_series_amplitudes_' + str(direction) +
                     str(self.campaign.body_id) + '.png', format='png',
                     dpi=500)
 
@@ -449,7 +449,7 @@ class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
         plt.title('Displacement phases', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/' + 'time_series_phases_' +
+        plt.savefig(fname=projection.folder_path + '/' + 'time_series_phases_' + str(direction) +
                     str(self.campaign.body_id) + '.png', format='png',
                     dpi=500)
 

@@ -386,10 +386,12 @@ class SurfaceDeformation1DTimeSeries(pet.component,
                                amplitude_uncertainties=amplitude_uncertainties, phases=phases,
                                phase_uncertainties=phase_uncertainties, topography_corrections=topography_corrections)
 
-    def visualize_time_series_amplitudes(self, projection, fig=None, globe=None, ax=None, return_fig=False):
+    def visualize_time_series_amplitudes(self, projection, direction, fig=None, globe=None, ax=None,
+                                         return_fig=False):
         """
         Visualize the amplitudes of the time series
         :param projection: Cartopy projection
+        :param direction: east, north, or up
         :param fig: matplotlib figure
         :param globe: cartopy globe
         :param ax: matplotlib ax
@@ -402,7 +404,15 @@ class SurfaceDeformation1DTimeSeries(pet.component,
             fig, ax, globe = projection.proj(planet=self.planet)
 
         # Load the values to plot
-        amplitudes = self.data["amplitudes"].values
+        if direction == "east":
+            amplitudes = self.data["amplitudes_east"].values
+        elif direction == "north":
+            amplitudes = self.data["amplitudes_north"].values
+        elif direction == "up":
+            amplitudes = self.data["amplitudes_up"].values
+        else:
+            raise Exception("direction must be east, north, or up")
+
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
 
@@ -420,14 +430,15 @@ class SurfaceDeformation1DTimeSeries(pet.component,
         plt.title('Displacement amplitudes', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/' + 'time_series_amplitudes_' +
-                    str(self.campaign.body_id) + '.png', format='png',
+        plt.savefig(fname=projection.folder_path + '/' + 'time_series_amplitudes_' + str(direction) +
+                          str(self.campaign.body_id) + '.png', format='png',
                     dpi=500)
 
-    def visualize_time_series_phases(self, projection, fig=None, globe=None, ax=None, return_fig=False):
+    def visualize_time_series_phases(self, projection, direction, fig=None, globe=None, ax=None, return_fig=False):
         """
         Visualize the phases of the time series
         :param projection: Cartopy projection
+        :param direction: east, north, or up
         :param fig: matplotlib figure
         :param globe: cartopy globe
         :param ax: matplotlib ax
@@ -440,7 +451,14 @@ class SurfaceDeformation1DTimeSeries(pet.component,
             fig, ax, globe = projection.proj(planet=self.planet)
 
         # Load the values to plot
-        phases = self.data["phases"].values
+        if direction == "east":
+            phases = self.data["phases_east"].values
+        elif direction == "north":
+            phases = self.data["phases_north"].values
+        elif direction == "up":
+            phases = self.data["phases_up"].values
+        else:
+            raise Exception("direction must be east, north, or up")
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
 
@@ -458,8 +476,8 @@ class SurfaceDeformation1DTimeSeries(pet.component,
         plt.title('Displacement phases', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/' + 'time_series_phases_' +
-                    str(self.campaign.body_id) + '.png', format='png',
+        plt.savefig(fname=projection.folder_path + '/' + 'time_series_phases_' + str(direction) +
+                          str(self.campaign.body_id) + '.png', format='png',
                     dpi=500)
 
-# end of file
+    # end of file
