@@ -3,6 +3,8 @@
 
 - Only works for repeat ground track orbits, otherwise we would have to do georeferencing and/or SAR processing
 - Plotting projections assuming biaxial ellipsoids
+- Todo: Add support for projecting on non-biaxial ellipsoids, add support for non-repeat ground tracks, add creating
+- 3D time-series from 1D time-series data, implement volumetric scattering, decorrelation, error propagation.
 
 Tool for creating a digital twin of a mission to a solar system body.
 

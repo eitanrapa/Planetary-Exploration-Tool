@@ -5,7 +5,6 @@
 # the pet development team
 # (c) 2023-2024 all rights reserved
 
-import threading
 import numpy as np
 import pet
 

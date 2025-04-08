@@ -41,25 +41,26 @@ deformation_map = pet.natureSimulations.geophysicalModel.tidalDeformationMap(nam
                                                                                                     "_Results.hdf5",
                                                                              planet=planet)
 
-# # First track
-# track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-#                                              file_name="/home/user/Documents/GitHub/"
-#                                                        "Planetary-Exploration-Tool/files/track1")
-#
-# track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-#                                              file_name="/home/user/Documents/GitHub/"
-#                                                        "Planetary-Exploration-Tool/files/track1")
-#
-# track2.modify_time(orbit_cycle_time)
-#
-# interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram1",
-#                                                                                 instrument=instrument, planet=planet,
-#                                                                                 deformation_map=deformation_map,
-#                                                                                 track1=track1, track2=track2,
-#                                                                                 campaign=campaign, baseline=10)
-# # Calculate interferogram
-# interferogram.calculate_igram()
-#
+# First track
+track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+                                             file_name="/home/user/Documents/GitHub/"
+                                                       "Planetary-Exploration-Tool/files/track1")
+
+track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
+                                             file_name="/home/user/Documents/GitHub/"
+                                                       "Planetary-Exploration-Tool/files/track1")
+
+track2.modify_time(orbit_cycle_time)
+
+interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram1",
+                                                                                instrument=instrument, planet=planet,
+                                                                                deformation_map=deformation_map,
+                                                                                track1=track1, track2=track2,
+                                                                                campaign=campaign, baseline=10,
+                                                                                baseline_uncertainty=1)
+# Calculate interferogram
+interferogram.calculate_igram()
+
 # # Save interferogram
 # interferogram.save(file_name="/home/user/Documents/GitHub/"
 #                              "Planetary-Exploration-Tool/files/igram_base_1")
