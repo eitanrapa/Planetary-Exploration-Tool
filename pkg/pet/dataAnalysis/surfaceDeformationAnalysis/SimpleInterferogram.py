@@ -41,6 +41,9 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
     baseline = pet.properties.float()
     baseline.doc = "baseline between the two tracks [m]"
 
+    baseline_uncertainty = pet.properties.float()
+    baseline_uncertainty.doc = "baseline uncertainty [m]"
+
     data = None
 
     @classmethod
@@ -71,7 +74,8 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         obj = cls(name="igram" + str(np.random.rand()),
                   planet=planet, instrument=instrument, campaign=campaign,
                   deformation_map=deformation_map, track1=track1,
-                  track2=track2, baseline=data.attrs["baseline"])
+                  track2=track2, baseline=data.attrs["baseline"],
+                  baseline_uncertainty=data.attrs["baseline_uncertainty"])
 
         obj.data = data  # Restore computed result
 
@@ -131,6 +135,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
                 deformation_map=self.deformation_map.pyre_name,
                 body_id=self.campaign.body_id,
                 baseline=self.baseline,
+                baseline_uncertainty=self.baseline_uncertainty,
                 start_time1=self.track1.start_time,
                 end_time1=self.track1.end_time,
                 start_time2=self.track2.start_time,

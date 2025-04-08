@@ -26,9 +26,21 @@ deformation_map = pet.natureSimulations.geophysicalModel.tidalDeformationMap(nam
                                                                              "Planetary-Exploration-Tool/"
                                                                              "input/Simulation_Base_Results.hdf5",
                                                                              planet=planet)
+
+# Make an instrument
+instrument = pet.instruments.inSAR.chirpChirp(name="chirp chirp")
+
 # Make a con ops
 campaign = pet.campaigns.orbiter.nightingale5to1(name="nightingale",
                                                  body_id=-303, start_time="2046 DEC 20 15:10:40.134", planet=planet)
+
+time_series = (
+    pet.dataAnalysis.surfaceDeformationAnalysis.surfaceDeformation3DTimeSeries.from_file(
+        planet=planet,
+        campaign=campaign,
+        instrument=
+        instrument,
+        file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/time_series_3d_base"))
 
 directions = ["east", "north", "up"]
 
@@ -53,9 +65,13 @@ for i in range(len(directions)):
     a_fits = np.asarray(a_fits)
     phi_fits = np.asarray(phi_fits)
 
+    amplitudes = time_series.data["amplitudes_{}".format(directions[i])].values
+
+    diff = a_fits - amplitudes
+
     # Plot the a_fits_recovered
     im = ax.scatter(lons.flatten(), lats.flatten(),
-                    c=a_fits, cmap='viridis', transform=ccrs.PlateCarree(globe=globe))
+                    c=diff, cmap='viridis', transform=ccrs.PlateCarree(globe=globe))
 
     # Add a colorbar
     plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25)

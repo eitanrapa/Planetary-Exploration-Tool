@@ -14,6 +14,7 @@ from tqdm import tqdm
 import alphashape
 from shapely.geometry import Point
 import xarray as xr
+from multiprocessing import Pool
 
 
 class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
@@ -150,7 +151,65 @@ class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
 
         return sigma_a, sigma_phase
 
-    def create_3d_time_series(self, interferograms, spatial_points, alpha=0.3):
+    @staticmethod
+    def parallel_interpolate_interferogram(args):
+        """
+        Use parallel processing to interpolate an interferogram
+        :param args: interferogram, spatial_points, alpha, shared_data, progress_queue,
+         (line_of_sight_vectors, d_vectors, g_matrices)
+        :return: Nothing returned
+        """
+
+        interferogram, spatial_points, alpha, planet_values = args
+
+        # Define the tidal cycle
+        tidal_cycle = planet_values["tidal_cycle"]
+        topography_uncertainty = planet_values["topography_uncertainty"]
+
+        # Extract data
+        latitudes = interferogram["latitude"].values
+        longitudes = interferogram["longitude"].values
+        points = np.column_stack((latitudes, longitudes))
+
+        # Create alpha shape (polygon)
+        polygon = alphashape.alphashape(points, alpha)
+
+        # Check which spatial points are inside the polygon
+        spatial_points_to_check = np.array([Point(point[0], point[1]) for point in spatial_points])
+        is_inside = np.array([polygon.contains(pt) for pt in spatial_points_to_check])
+
+        # Extract valid spatial points
+        valid_points = spatial_points[is_inside]
+
+        # Initialize results dictionary
+        results = {var: np.full(len(spatial_points), np.nan) for var in
+                   ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]}
+
+        # Interpolate each desired variable
+        for var in results.keys():
+            values = interferogram.values if var == "los_displacements" else interferogram[var].values
+            interpolated_values = griddata(points, values, xi=valid_points, method="cubic")
+            results[var][is_inside] = interpolated_values
+
+        # Extract interpolated values
+        sat_times = np.asarray(results["sat_pos_time"])
+        time1_interps = (np.asarray(results["time1"]) % tidal_cycle)
+        time2_interps = (np.asarray(results["time2"]) % tidal_cycle)
+        x_interps, y_interps, z_interps = np.asarray(results["x"]), np.asarray(results["y"]), np.asarray(results["z"])
+        los_displacement_interps = np.asarray(results["los_displacements"])
+        psis_interps_real = np.asarray(results["psi"]) * interferogram.attrs["baseline"]
+        psis_interps_know = np.asarray(results["psi"]) * np.random.normal(
+            loc=interferogram.attrs["baseline"], scale=interferogram.attrs["baseline_uncertainty"])
+        los_displacement_interps_with_noise = (los_displacement_interps +
+                                               psis_interps_real * topography_uncertainty)
+
+        # Prepare data for return
+        valid_point_indices = np.where(is_inside)[0]
+
+        return (sat_times, valid_point_indices, los_displacement_interps_with_noise,
+                x_interps, y_interps, z_interps, time1_interps, time2_interps, psis_interps_know)
+
+    def create_3d_time_series(self, interferograms, spatial_points, alpha=0.3, processors=1):
         """
         Return the amplitudes, phases, and topographic errors of a set of points in 3 or more look directions
         :param interferograms: interferograms to analyze
@@ -172,98 +231,151 @@ class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
 
         line_of_sight_vectors = [[] for _ in range(len(spatial_points))]
 
-        # Iterate through the interferograms
-        for interferogram in tqdm(interferograms, desc="Interpolating interferograms..."):
+        if processors == 1:
 
-            # Load the data
-            data_array = interferogram.data
+            # Iterate through the interferograms
+            for interferogram in tqdm(interferograms, desc="Interpolating interferograms..."):
 
-            # Extract data
-            latitudes = data_array["latitude"].values
-            longitudes = data_array["longitude"].values
-            points = np.column_stack((latitudes, longitudes))
+                # Load the data
+                data_array = interferogram.data
 
-            # Create alpha shape (polygon)
-            polygon = alphashape.alphashape(points, alpha)
+                # Extract data
+                latitudes = data_array["latitude"].values
+                longitudes = data_array["longitude"].values
+                points = np.column_stack((latitudes, longitudes))
 
-            # Check which spatial points are inside the polygon
-            spatial_points_to_check = np.array([Point(point[0], point[1]) for point in spatial_points])
-            is_inside = np.array([polygon.contains(pt) for pt in spatial_points_to_check])
+                # Create alpha shape (polygon)
+                polygon = alphashape.alphashape(points, alpha)
 
-            # Extract valid spatial points
-            valid_points = spatial_points[is_inside]
+                # Check which spatial points are inside the polygon
+                spatial_points_to_check = np.array([Point(point[0], point[1]) for point in spatial_points])
+                is_inside = np.array([polygon.contains(pt) for pt in spatial_points_to_check])
 
-            # Initialize results dictionary
-            results = {var: np.full(len(spatial_points), np.nan) for var in
-                       ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]}
+                # Extract valid spatial points
+                valid_points = spatial_points[is_inside]
 
-            # Interpolate each desired variable
-            for var in ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]:
-                if var == "los_displacements":
-                    values = data_array.values
-                else:
-                    values = data_array[var].values
+                # Initialize results dictionary
+                results = {var: np.full(len(spatial_points), np.nan) for var in
+                           ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]}
 
-                # Perform interpolation only for valid points
-                interpolated_values = griddata(points=points, values=values, xi=valid_points, method="cubic")
+                # Interpolate each desired variable
+                for var in ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]:
+                    if var == "los_displacements":
+                        values = data_array.values
+                    else:
+                        values = data_array[var].values
 
-                # Assign interpolated values back to the corresponding positions
-                results[var][is_inside] = interpolated_values
+                    # Perform interpolation only for valid points
+                    interpolated_values = griddata(points=points, values=values, xi=valid_points, method="cubic")
 
-            # Extract interpolated values
-            sat_times = np.asarray(results["sat_pos_time"])
-            time1_interps = (np.asarray(results["time1"]) % tidal_cycle)
-            time2_interps = (np.asarray(results["time2"]) % tidal_cycle)
-            x_interps = np.asarray(results["x"])
-            y_interps = np.asarray(results["y"])
-            z_interps = np.asarray(results["z"])
-            los_displacement_interps = np.asarray(results["los_displacements"])
-            psis_interps = np.asarray(results["psi"])
-            psis_interps = psis_interps * data_array.attrs["baseline"]
-            los_displacement_interps_with_noise = (los_displacement_interps +
-                                                   psis_interps * self.planet.topography_uncertainty)
+                    # Assign interpolated values back to the corresponding positions
+                    results[var][is_inside] = interpolated_values
 
-            # Get the satellite and surface positions
-            satellite_positions, _ = self.campaign.get_states(times=sat_times)
-            surface_positions = np.asarray([x_interps, y_interps, z_interps]).T
+                # Extract interpolated values
+                sat_times = np.asarray(results["sat_pos_time"])
+                time1_interps = (np.asarray(results["time1"]) % tidal_cycle)
+                time2_interps = (np.asarray(results["time2"]) % tidal_cycle)
+                x_interps = np.asarray(results["x"])
+                y_interps = np.asarray(results["y"])
+                z_interps = np.asarray(results["z"])
+                los_displacement_interps = np.asarray(results["los_displacements"])
+                psis_interps_real = np.asarray(results["psi"]) * data_array.attrs["baseline"]
+                psis_interps_know = np.asarray(results["psi"]) * np.random.normal(
+                    loc=data_array.attrs["baseline"], scale=data_array.attrs["baseline_uncertainty"])
+                los_displacement_interps_with_noise = (los_displacement_interps +
+                                                       psis_interps_real * self.topography_uncertainty)
 
-            # Calculate vectors from satellite to point and the satellite's direction
-            vectors_to_sat = (satellite_positions - surface_positions)
-            vectors_to_sat = [vector / np.linalg.norm(vector) for vector in vectors_to_sat]
+                # Get the satellite and surface positions
+                satellite_positions, _ = self.campaign.get_states(times=sat_times)
+                surface_positions = np.asarray([x_interps, y_interps, z_interps]).T
 
-            # Save indices of rows that are added
-            valid_point_indices = []
-            for i in range(len(spatial_points)):
-                # Check if the look angle and relative position is correct
-                if is_inside[i]:
-                    valid_point_indices.append(i)
+                # Calculate vectors from satellite to point and the satellite's direction
+                vectors_to_sat = (satellite_positions - surface_positions)
+                vectors_to_sat = [vector / np.linalg.norm(vector) for vector in vectors_to_sat]
+
+                valid_point_indices = np.where(is_inside)[0]
+
+                for i in valid_point_indices:
                     if not any(np.allclose(vectors_to_sat[i], x, atol=0.1) for x in line_of_sight_vectors[i]):
                         line_of_sight_vectors[i].append(vectors_to_sat[i])
 
-            # Append to d_vectors and G_matrices for each point if the point is valid
-            [d_vectors[i].append(los_displacement_interps_with_noise[i]) for i in valid_point_indices]
+                    d_vectors[i].append(los_displacement_interps_with_noise[i])
 
-            # Construct the G matrix, passing through vector conversion to ENU
-            [g_matrices[i].append([
-                *[arr.squeeze() for arr
-                  in vector_conversions.cartesian_to_enu_vector(
-                        uvw_vectors=
-                        [vectors_to_sat[i][0] * (np.cos(omega * time2_interps[i]) - np.cos(omega * time1_interps[i])),
-                         vectors_to_sat[i][1] * (np.cos(omega * time2_interps[i]) - np.cos(omega * time1_interps[i])),
-                         vectors_to_sat[i][2] * (np.cos(omega * time2_interps[i]) - np.cos(omega * time1_interps[i]))],
-                        latitudes=[spatial_points[i, 0]], longitudes=[spatial_points[i, 1]]
-                    )],  # First 3 elements: vector0
-                *[arr.squeeze() for arr
-                  in vector_conversions.cartesian_to_enu_vector(
-                        uvw_vectors=
-                        [vectors_to_sat[i][0] * (np.sin(omega * time2_interps[i]) - np.sin(omega * time1_interps[i])),
-                         vectors_to_sat[i][1] * (np.sin(omega * time2_interps[i]) - np.sin(omega * time1_interps[i])),
-                         vectors_to_sat[i][2] * (np.sin(omega * time2_interps[i]) - np.sin(omega * time1_interps[i]))],
-                        latitudes=[spatial_points[i, 0]], longitudes=[spatial_points[i, 1]]
-                    )],  # Next 3 elements: vector1
-                psis_interps[i],  # Final element
-            ]
-            ) for i in valid_point_indices]
+                    # Compute ENU vectors
+                    vector0 = vector_conversions.cartesian_to_enu_vector(
+                        uvw_vectors=[
+                            vectors_to_sat[i][j] * (np.cos(omega * time2_interps[i]) - np.cos(omega * time1_interps[i]))
+                            for j in range(3)
+                        ],
+                        latitudes=[spatial_points[i, 0]],
+                        longitudes=[spatial_points[i, 1]]
+                    )
+
+                    vector1 = vector_conversions.cartesian_to_enu_vector(
+                        uvw_vectors=[
+                            vectors_to_sat[i][j] * (np.sin(omega * time2_interps[i]) - np.sin(omega * time1_interps[i]))
+                            for j in range(3)
+                        ],
+                        latitudes=[spatial_points[i, 0]],
+                        longitudes=[spatial_points[i, 1]]
+                    )
+
+                    g_matrices[i].append([*vector0.squeeze(), *vector1.squeeze(), psis_interps_know[i]])
+
+        else:
+
+            # Extract only necessary values to avoid pickle issues
+            planet_values = {
+                "tidal_cycle": self.planet.tidal_cycle,
+                "topography_uncertainty": self.planet.topography_uncertainty
+            }
+
+            with Pool(processors) as pool:
+
+                results = list(tqdm(pool.imap(self.parallel_interpolate_interferogram,
+                                              [(interferogram.data,
+                                                spatial_points, alpha, planet_values)
+                                               for interferogram in interferograms]),
+                                    total=len(interferograms), desc="Interpolating interferograms..."))
+
+            for (sat_times, valid_point_indices, los_displacement_interps_with_noise,
+                 x_interps, y_interps, z_interps, time1_interps, time2_interps, psis_interps) in results:
+
+                # Get satellite and surface positions
+                satellite_positions, _ = self.campaign.get_states(times=sat_times)
+                surface_positions = np.asarray([x_interps, y_interps, z_interps]).T
+
+                # Compute vectors to satellite
+                vectors_to_sat = [(satellite_positions[i] - surface_positions[i]) / np.linalg.norm(
+                    satellite_positions[i] - surface_positions[i])
+                                  for i in range(len(surface_positions))]
+
+                for i in valid_point_indices:
+                    if not any(np.allclose(vectors_to_sat[i], x, atol=0.1) for x in line_of_sight_vectors[i]):
+                        line_of_sight_vectors[i].append(vectors_to_sat[i])
+
+                    d_vectors[i].append(los_displacement_interps_with_noise[i])
+
+                    # Compute ENU vectors
+                    vector0 = vector_conversions.cartesian_to_enu_vector(
+                        uvw_vectors=[
+                            vectors_to_sat[i][j] * (np.cos(omega * time2_interps[i]) - np.cos(omega * time1_interps[i]))
+                            for j in range(3)
+                        ],
+                        latitudes=[spatial_points[i, 0]],
+                        longitudes=[spatial_points[i, 1]]
+                    )
+
+                    vector1 = vector_conversions.cartesian_to_enu_vector(
+                        uvw_vectors=[
+                            vectors_to_sat[i][j] * (np.sin(omega * time2_interps[i]) - np.sin(omega * time1_interps[i]))
+                            for j in range(3)
+                        ],
+                        latitudes=[spatial_points[i, 0]],
+                        longitudes=[spatial_points[i, 1]]
+                    )
+
+                    g_matrices[i].append([*vector0.squeeze(), *vector1.squeeze(), psis_interps[i]])
 
         # Convert lists to numpy arrays and reshape
         d_vectors = {i: np.array(d_vectors[i]) for i in d_vectors}  # Shape: (num_times, d_dim)
@@ -354,11 +466,6 @@ class SurfaceDeformation3DTimeSeries(pet.component, family="pet.dataAnalysis."
         self.create_data_array(geodetic_coordinates=spatial_points, amplitudes=amplitudes,
                                amplitude_uncertainties=amplitude_uncertainties, phases=phases,
                                phase_uncertainties=phase_uncertainties, topography_corrections=topography_corrections)
-
-    # def create_3d_time_series_from_1d(self, time_series):
-    #     """
-    #
-    #     """
 
     def visualize_time_series_amplitudes(self, projection, direction, fig=None, globe=None, ax=None, return_fig=False):
         """
