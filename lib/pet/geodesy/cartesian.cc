@@ -1,3 +1,9 @@
+// -*- C++ -*-
+//
+// the pet development team
+// (c) 2023-2025 all rights reserved
+//
+
 #include <cmath>
 #include "cartesian.h"
 
@@ -47,3 +53,5 @@ void pet::cartesian(const TriaxialEllipsoid& te, const GeodeticPoint& gp, Cartes
     cp.y=(N*mee+gp.height)*pc*ls;
     cp.z=(N*mex+gp.height)*ps;
 }
+
+// end of file
