@@ -3,7 +3,7 @@
 # -*- coding: utf-8 -*-
 #
 # the pet development team
-# (c) 2023-2024 all rights reserved
+# (c) 2023-2025 all rights reserved
 
 import pet
 import matplotlib.pyplot as plt
@@ -40,15 +40,56 @@ time_series = (
         campaign=campaign,
         instrument=
         instrument,
-        file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/time_series_3d_base"))
+        file_name="/home/user/Downloads/time_series_3d_base"))
 
-directions = ["east", "north", "up"]
+# import xarray as xr
+#
+# # Open the HDF5 file in read mode
+# data = xr.open_dataset(filename_or_obj="/home/user/Downloads/time_series_3d_base.nc")
+#
+# # Create a dense mesh grid of latitude, longitude points
+# lats = np.linspace(89.5, -89.5, 359)
+# lons = np.linspace(179.5, -179.5, 719)
+# lats, lons = np.meshgrid(lats, lons)
+#
+# amplitudes_east = data["amplitudes_east"].values
+# amplitudes_north = data["amplitudes_north"].values
+# amplitudes_up = data["amplitudes_up"].values
+#
+# phases_east = data["phases_east"].values
+# phases_north = data["phases_north"].values
+# phases_up = data["phases_up"].values
+#
+# # Define a projection
+# projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", central_latitude=-90,
+#                                                               north_extent=-30,
+#                                                               folder_path="/home/user/"
+#                                                                           "Documents/GitHub/"
+#                                                                           "Planetary-Exploration-Tool/figs")
+#
+# fig, ax, globe = projection.proj(planet=planet)
+#
+# # Plot the a_fits_recovered
+# im = ax.scatter(lons.flatten(), lats.flatten(),
+#                 c=amplitudes_up, cmap='viridis', transform=ccrs.PlateCarree(globe=globe))
+#
+# # Add a colorbar
+# plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25)
+#
+# # Add labels and legend
+# plt.title('Displacements ', pad=20)
+#
+# # Save the plot
+# plt.show()
+
+# directions = ["east", "north", "up"]
+directions = ["up"]
 
 for i in range(len(directions)):
 
     # Define a projection
     projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", central_latitude=-90,
-                                                                  north_extent=-30,
+                                                                  north_extent=0,
                                                                   folder_path="/home/user/"
                                                                               "Documents/GitHub/"
                                                                               "Planetary-Exploration-Tool/figs")
@@ -71,7 +112,7 @@ for i in range(len(directions)):
 
     # Plot the a_fits_recovered
     im = ax.scatter(lons.flatten(), lats.flatten(),
-                    c=diff, cmap='viridis', transform=ccrs.PlateCarree(globe=globe))
+                    c=a_fits, cmap='viridis', transform=ccrs.PlateCarree(globe=globe))
 
     # Add a colorbar
     plt.colorbar(im, ax=ax, orientation='vertical', shrink=0.25)
@@ -81,21 +122,21 @@ for i in range(len(directions)):
 
     # Save the plot
     plt.show()
-
-# Define a projection
-projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", central_latitude=-90,
-                                                              north_extent=-30,
-                                                              folder_path="/home/user/Documents/"
-                                                                          "GitHub/Planetary-Exploration-Tool/figs")
-
-# Visualize displacements
-deformation_map.visualize(projection=projection, time_point=0, direction="east")
-
-# Visualize displacements
-deformation_map.visualize(projection=projection, time_point=0, direction="north")
-
-# Visualize displacements
-deformation_map.visualize(projection=projection, time_point=0, direction="up")
+#
+# # Define a projection
+# projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar", central_latitude=-90,
+#                                                               north_extent=-30,
+#                                                               folder_path="/home/user/Documents/"
+#                                                                           "GitHub/Planetary-Exploration-Tool/figs")
+#
+# # Visualize displacements
+# deformation_map.visualize(projection=projection, time_point=0, direction="east")
+#
+# # Visualize displacements
+# deformation_map.visualize(projection=projection, time_point=0, direction="north")
+#
+# # Visualize displacements
+# deformation_map.visualize(projection=projection, time_point=0, direction="up")
 
 fm.clear()
 

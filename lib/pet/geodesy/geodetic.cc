@@ -1,3 +1,9 @@
+// -*- C++ -*-
+//
+// the pet development team
+// (c) 2023-2025 all rights reserved
+//
+
 #include <cmath>
 #include "geodetic.h"
 
@@ -269,3 +275,5 @@ int pet::sign(double t)
 
 	return n;
 }
+
+// end of file

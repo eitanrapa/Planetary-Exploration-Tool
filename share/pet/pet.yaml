@@ -1,6 +1,6 @@
 #
 # the pet development team
-# (c) 2023-2024 all rights reserved
+# (c) 2023-2025 all rights reserved
 
 
 # project info
@@ -8,8 +8,8 @@ project:
   name: pet
   capname: PET
   authors: the pet development team
-  span: 2023-2024
-  github: git@github.nasa.gov:ng-eet/pet
+  span: 2023-2025
+  github: git@github.com:eitanrapa/Planetary-Exploration-Tool.git
 
 
 # end of file
