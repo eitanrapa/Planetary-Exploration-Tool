@@ -1,21 +1,21 @@
 # Code developed and maintained exclusively by Eitan Rapaport, Michael Aivazis, Mark Simons
 # Planetary-Exploration-Tool (PET)
 
-- Only works for repeat ground track orbits, otherwise we would have to do georeferencing and/or SAR processing
+- Ground swaths calculated through look angle geometry instead of maximum incidence angle
+- No SAR unwrapping error included
+- Only works for repeat ground track orbits, otherwise we would have to do georeferencing to match swaths
+- Assumes approximation that dr between acquisitions is equal to Bperp, such that uncertainty in dr is 
+- equal to uncertainty in Bperp, uncertainty in topography is also added linearly
 - Plotting projections assuming biaxial ellipsoids
-- Todo: Add support for projecting on non-biaxial ellipsoids, add support for non-repeat ground tracks, add creating
-- 3D time-series from 1D time-series data, implement volumetric scattering, decorrelation, error propagation.
+- Todo: Add creating  3D time-series from 1D time-series data, instrument noise, inverse correlation error
 
 Tool for creating a digital twin of a mission to a solar system body.
 
 # Installation Instructions
 
-1. Have/install GCC and GNU make
-2. Have/install at least Python 3.7.2
-3. Have/install CSPYCE (https://github.com/SETI/rms-cspyce)
-4. Clone https://github.com/aivazis/mm.git
-5. Clone https://github.com/pyre/pyre
-6. Create mm config file:
+1. Have/install at least Python 3.7.2
+2. Clone https://github.com/aivazis/mm.git
+3. Create mm config file:
     a. Go to home directory
     b. Go to or create a .config directory
     c. Create a directory called "mm"
@@ -29,16 +29,13 @@ Tool for creating a digital twin of a mission to a solar system body.
         sys.prefix := ${CONDA_PREFIX}
 
         # gsl
-        gsl.version := 2.7
         gsl.dir := $(sys.prefix)
 
         # hdf5
-        hdf5.version := 1.15.0
         hdf5.dir := ${sys.prefix}
         hdf5.parallel := off
 
         # libpq
-        libpq.version := 16.1
         libpq.dir := ${sys.prefix}
 
         # python
@@ -46,15 +43,12 @@ Tool for creating a digital twin of a mission to a solar system body.
         python.dir := $(sys.prefix)
 
         # pybind11
-        pybind11.version := 2.11.1
         pybind11.dir = $(sys.prefix)
 
         # numpy
-        numpy.version := 2.1
         numpy.dir := $(sys.prefix)/lib/python$(python.version)/site-packages/numpy/_core
 
         # pyre
-        pyre.version := 1.12.4
         pyre.dir := $(sys.prefix)
 
         # install the python packages straight where they need to go
@@ -66,7 +60,7 @@ Tool for creating a digital twin of a mission to a solar system body.
         
         # end of file
 
-7. Create the mm yaml file:
+4. Create the mm yaml file:
     a. Go to home directory
     b. Go to .config directory
     c. Create a directory called "pyre"
@@ -100,7 +94,7 @@ Tool for creating a digital twin of a mission to a solar system body.
 
         # end of file
         
-8. Create a conda/mamba environment for the package
+5. Create a conda/mamba environment for the package
     a. Install conda/mamba if necessary
     b. Make a file in any directory and call it "pet.yaml"
     c. Copy and paste the following into the file:
@@ -117,30 +111,23 @@ Tool for creating a digital twin of a mission to a solar system body.
             
         dependencies:
           - python
+          - pyre
           - git
           - gcc
           - gxx
-          - gfortran
           - make
-          - automake
-          - nodejs
-          - libtool
           - curl
-          - fftw
           - gsl
           - hdf5
           - libpq
-          - openssl
           - pip
           - setuptools
-          - graphene
           - matplotlib
           - numpy
+          - pip
+          - pip:
+            - cspyce
           - pybind11
-          - pytest
-          - ruamel.yaml
-          - scipy
-          - yaml
           - pyyaml
           - ipython
           - pandas
@@ -156,7 +143,6 @@ Tool for creating a digital twin of a mission to a solar system body.
 
     d. Run the command "conda env create -f pet.yaml"
     e. Activate the environment
-    
-9. Go to the pyre directory and run the command "python3 [PATH]/mm/mm.py" replacing [PATH] with the path to the mm directory
-10. Go to the PET directory and run the command "python3 [PATH]/mm/mm.py" replacing [PATH] with the path to the mm directory
-11. Ready to go!
+
+6. Go to the PET directory and run the command "python3 [PATH]/mm/mm.py" replacing [PATH] with the path to the mm directory 8
+7. Ready to go!
