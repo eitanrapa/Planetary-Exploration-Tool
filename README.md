@@ -16,10 +16,15 @@ Tool for creating a digital twin of a mission to a solar system body.
 1. Have/install at least Python 3.7.2
 2. Clone https://github.com/aivazis/mm.git
 3. Create mm config file:
+
     a. Go to home directory
+
     b. Go to or create a .config directory
+
     c. Create a directory called "mm"
-    d. Copy and paste the following into a file named "config.mm" in the "mm" directory:
+
+    d. Copy and paste the following into a file named "config.mm" in the "mm" directory,
+**changing the python version to the one you are using**:
     
         # -*- Makefile -*-
         #
@@ -61,10 +66,15 @@ Tool for creating a digital twin of a mission to a solar system body.
         # end of file
 
 4. Create the mm yaml file:
+
     a. Go to home directory
+
     b. Go to .config directory
+
     c. Create a directory called "pyre"
-    d. Copy and paste the following into a file named "mm.yaml" in the "pyre" directory:
+
+    d. Copy and paste the following into a file named "mm.yaml" in the "pyre" directory, 
+**changing the python version to the one you are using**::
     
         # -*- yaml -*-
         #
@@ -95,8 +105,11 @@ Tool for creating a digital twin of a mission to a solar system body.
         # end of file
         
 5. Create a conda/mamba environment for the package
+
     a. Install conda/mamba if necessary
+
     b. Make a file in any directory and call it "pet.yaml"
+
     c. Copy and paste the following into the file:
     
         # -*- yaml -*-
@@ -138,6 +151,7 @@ Tool for creating a digital twin of a mission to a solar system body.
           - cartopy
           - xarray
           - alphashape
+          - netcdf4
 
         # end of file
 
