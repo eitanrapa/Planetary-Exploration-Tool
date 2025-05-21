@@ -1,13 +1,12 @@
-# Code developed and maintained exclusively by Eitan Rapaport, Michael Aivazis, Mark Simons
+# Code developed and maintained exclusively by Eitan Rapaport, Andreas Benedikter, Michael Aivazis, Mark Simons 
 # Planetary-Exploration-Tool (PET)
 
 - Ground swaths calculated through look angle geometry instead of maximum incidence angle
+- For ground intersects, nadir is sweeped instead of plane perpendicular to the velocity
 - No SAR unwrapping error included
 - Only works for repeat ground track orbits, otherwise we would have to do georeferencing to match swaths
-- Assumes approximation that dr between acquisitions is equal to Bperp, such that uncertainty in dr is 
-- equal to uncertainty in Bperp, uncertainty in topography is also added linearly
 - Plotting projections assuming biaxial ellipsoids
-- Todo: Add creating  3D time-series from 1D time-series data, instrument noise, inverse correlation error
+- Todo: Add creating 3D time-series from 1D time-series data
 
 Tool for creating a digital twin of a mission to a solar system body.
 

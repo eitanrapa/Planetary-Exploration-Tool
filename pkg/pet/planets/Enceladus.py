@@ -31,8 +31,20 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     tidal_cycle.doc = "The tidal cycle of Enceladus [s]"
 
     topography_uncertainty = pet.properties.float()
-    topography_uncertainty.default = 300
+    topography_uncertainty.default = 100
     topography_uncertainty.doc = "The uncertainty in the topography of Enceladus [m]"
+
+    surface_backscatter = pet.properties.float()
+    surface_backscatter.default = 0
+    surface_backscatter.doc = "The surface backscatter of Enceladus [dB]"
+
+    radar_penetration_depth = pet.properties.float()
+    radar_penetration_depth.default = 15
+    radar_penetration_depth.doc = "The radar penetration depth of Enceladus [m]"
+
+    surface_permittivity = pet.properties.float()
+    surface_permittivity.default = 2.2
+    surface_permittivity.doc = "Relative permittivity of the snow/ice volume [m]"
 
     @pet.export
     def get_axes(self):
@@ -53,10 +65,11 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         return np.asarray([a, b, c])
 
     @pet.export
-    def get_surface_intersects(self, vectors):
+    def get_surface_intersects(self, vertex, raydirs):
         """
         Find the intersects of a set of vectors with the planet DSK
-        :param vectors: Vectors for which to find intersects
+        :param vertex: Vectors for which to find intersects
+        :param raydirs: The directions of the vectors
         :return: The x, y, z intersects of the vectors with the DSK [m]
         """
 
@@ -66,9 +79,16 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         # Retrieve the DSK DLA
         dla = spice.dlabfs(handle=handle)
 
+        intersects = []
+
         # Use the SPICE toolkit to calculate the intersects
-        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=vector * 10, raydir=vector - (vector * 10))[1] for
-                      vector in vectors]
+        for raydir in raydirs:
+            # Check if intersect exists
+            try:
+                intersects.append(spice.dskx02(handle=handle, dladsc=dla, vertex=vertex*1e-3, raydir=raydir)[1])
+            except ValueError:
+                # If not, append NaN
+                intersects.append([np.nan, np.nan, np.nan])
 
         # Convert to meters
         intersects = np.asanyarray(intersects) * 1e3
