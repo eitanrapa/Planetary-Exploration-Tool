@@ -5,10 +5,36 @@
 # the pet development team
 # (c) 2023-2025 all rights reserved
 
+import numpy as np
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 import pet
 
+
+def convert_positions(cartesian_positions, planet):
+    """
+    Convert flattened points to geodetic coordinates
+    :param cartesian_positions: Points to convert
+    :return: Points in geodetic coordinates
+    """
+    # Get planet axes
+    a, b, c = planet.get_axes()
+
+    # Create a coordinate conversion object
+    coordinate_conversions = pet.conversions.coordinateConversions(name="conversions", a=a, b=b, c=c)
+
+    # Get the corresponding latitude and longitude with a triaxial ellipsoid conversion
+    flattened_swath_coordinates = np.asarray(coordinate_conversions.geodetic(
+        cartesian_coordinates=cartesian_positions))
+
+    return flattened_swath_coordinates
+
+
+
+
+
 # Create a file manager
-fm = pet.spiceTools.fileManager(folder_path="/home/user/Documents/GitHub/Planetary-Exploration-Tool/input")
+fm = pet.spiceTools.fileManager(folder_path="/data/largeHome/bene_an/Projects/nightingale/Simulation/Planetary-Exploration-Tool/data/")
 
 # Furnish some files
 fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tpc",
@@ -30,68 +56,90 @@ times = campaign.get_five_tracks()
 # Get the orbit cycle time of the instrument
 orbit_cycle_time = campaign.orbit_cycle
 
-# Make a displacement map
-deformation_map = pet.natureSimulations.geophysicalModel.tidalDeformationMap(name="base",
-                                                                             displacement_data_path="/home/user/"
-                                                                                                    "Documents/GitHub/"
-                                                                                                    "Planetary-"
-                                                                                                    "Exploration-Tool/"
-                                                                                                    "input/"
-                                                                                                    "Simulation_Base"
-                                                                                                    "_Results.hdf5",
-                                                                             planet=planet)
+# Get the track
+track = pet.dataAcquisition.track(name="track", start_time=times[0], end_time=times[0] + 60*90, planet=planet,
+                                  campaign=campaign, instrument=instrument, spatial_resolution=500,
+                                  temporal_resolution=10, interpol2FinalRes=1, interferogram_resolution_az=500,
+                                  interferogram_resolution_rg=500)
+track.calculate_ground_swath_new()
 
-# First track
-track1 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track1")
 
-track2 = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
-                                             file_name="/home/user/Documents/GitHub/"
-                                                       "Planetary-Exploration-Tool/files/track1")
 
-track2.modify_time(orbit_cycle_time)
-
-interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram(name="igram1",
-                                                                                instrument=instrument, planet=planet,
-                                                                                deformation_map=deformation_map,
-                                                                                track1=track1, track2=track2,
-                                                                                campaign=campaign, baseline=10,
-                                                                                baseline_uncertainty=1)
+# Specify the baseline
+baseline = 15.
+# Specify the basline uncertainty
+baseline_uncertainty = 0.
+# Specify the baseline orientation (roll=0 means horizontal)
+roll = np.deg2rad(0)
+# Specify the roll uncertainty
+roll_uncertainty = 0.#np.deg2rad(-8 / 3600)
+# compute the interferogram
+interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogramTopo(name="igram",
+                                                                                instrument=instrument,
+                                                                                planet=planet,
+                                                                                track=track,
+                                                                                campaign=campaign,
+                                                                                baseline=baseline,
+                                                                                baseline_uncertainty=baseline_uncertainty,
+                                                                                roll=roll,
+                                                                                roll_uncertainty=roll_uncertainty)
 # Calculate interferogram
 interferogram.calculate_igram()
+# Save interferogram
+interferogram.save(file_name="/data/largeHome/bene_an/Projects/nightingale/Simulation/Planetary-Exploration-Tool/output/files/iinterferogram")
 
-# # Save interferogram
-# interferogram.save(file_name="/home/user/Documents/GitHub/"
-#                              "Planetary-Exploration-Tool/files/igram_base_1")
+# read interferometric results----------------
+xyz_meas = interferogram.xyz_meas
+llh = convert_positions(xyz_meas,planet)
+longitudes = llh[:,1]
+latitudes = llh[:,0]
+heights = llh[:,2]
+#get height error
+heightError_corr = -1*planet.get_height_above_surface(xyz_meas)
+#---------------------------------------------
 
-# Load the interferogram
-interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram.from_file(instrument=instrument,
-                                                                                          planet=planet,
-                                                                                          deformation_map=
-                                                                                          deformation_map,
-                                                                                          campaign=campaign,
-                                                                                          file_name="/home/user/"
-                                                                                                    "Documents/"
-                                                                                                    "GitHub/"
-                                                                                                    "Planetary"
-                                                                                                    "-Exploration-Tool/"
-                                                                                                    "files/igram_"
-                                                                                                    "base_1")
-
-# Define a projection
+#plot height-------------------------------------------------------------------
 projection = pet.projections.biaxialProjections.biaxialCylindrical(name="biaxial cylindrical",
-                                                                   folder_path=
-                                                                   "/home/user/Documents/GitHub/Planetary"
-                                                                   "-Exploration-Tool/figs/")
+                                                                        folder_path="/data/largeHome/bene_an/Projects/nightingale/Simulation/Planetary-Exploration-Tool/output/plots/")
+fig1, ax1, globe1 = projection.proj(planet=planet)
+# Make the colormap cyclical
+cm = plt.cm.get_cmap('terrain')
+im = ax1.scatter(longitudes, latitudes, cmap=cm,
+                transform=ccrs.PlateCarree(globe=globe1), c=heightError_corr, s=0.01,marker=',')
+plt.colorbar(im, fraction=0.02, pad=0.1)
+plt.title('height error [m]', pad=12)
+plt.savefig('heightError.png', format='png',dpi=300,bbox_inches="tight")
 
-# Plot interferogram
-fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
-interferogram.visualize_interferogram(projection=projection, fig=fig, globe=globe, ax=ax)
+fig2, ax2, globe2 = projection.proj(planet=planet)
+# Make the colormap cyclical
+cm = plt.cm.get_cmap('terrain')
+im = ax2.scatter(longitudes, latitudes, cmap=cm,
+                transform=ccrs.PlateCarree(globe=globe2), c=heights, s=0.01,marker=',')
+plt.colorbar(im, fraction=0.02, pad=0.1)
+plt.title('measured height [m]', pad=12)
+plt.savefig('height_meas.png', format='png',dpi=300,bbox_inches="tight")
+#------------------------------------------------------------------------------
 
-# Plot the displacements
-fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
-interferogram.visualize_displacements(projection=projection, fig=fig, globe=globe, ax=ax)
+
+#plot some interferometric products--------------------------------------------
+kz = interferogram.data['kz'].kz.values
+HoA = 2 * np.pi / kz
+incAng = interferogram.data['incAng'].incAng.values
+phase_absolut = interferogram.data['phase_absolut'].phase_absolut.values
+phase_ref = interferogram.data['phase_ref'].phase_ref.values
+phase_flat = phase_absolut - phase_ref
+phase_flat_wrapped = phase_flat%(2*np.pi)
+height_true = track.data["height"].values
+
+interferogram.visualize_interferogram(phase_flat, projection, "hsv","flattened phase [rad]", "phase_flat.png")
+interferogram.visualize_interferogram(phase_absolut, projection, "hsv", "absolut phase [rad]", "phase_absolut.png")
+interferogram.visualize_interferogram(phase_ref, projection, "hsv","reference phase [rad]", "phase_reference.png")
+interferogram.visualize_interferogram(phase_flat_wrapped, projection, "hsv","wrapped phase [rad]", "phase_wrapped.png")
+interferogram.visualize_interferogram(np.rad2deg(incAng), projection, "Spectral","incident angle knowledge [deg]", "incAng_know.png")
+interferogram.visualize_interferogram(np.rad2deg(track.data.values), projection, "Spectral", "incident angle [deg]", "incAng.png")
+interferogram.visualize_interferogram(HoA, projection, "Spectral","height of ambiguity knowledge [m]", "HoA_know.png")
+interferogram.visualize_interferogram(height_true, projection, "terrain","DEM [m]", "DEM.png")
+#------------------------------------------------------------------------------
 
 fm.clear()
 
