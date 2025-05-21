@@ -27,14 +27,14 @@ campaign = pet.campaigns.orbiter.nightingale5to1(name="nightingale",
 # # Get the times defining the first five tracks
 times = campaign.get_five_tracks()
 
-# # First track
-# track = pet.dataAcquisition.track(name="track1", start_time=times[0], end_time=times[1], planet=planet,
-#                                   campaign=campaign, instrument=instrument, spatial_resolution=2000,
-#                                   temporal_resolution=60)
-#
-# # Calculate the positions
-# track.calculate_ground_swath()
-#
+# First track
+track1 = pet.dataAcquisition.track(name="track1", start_time=times[0], end_time=times[1], planet=planet,
+                                  campaign=campaign, instrument=instrument, spatial_resolution=2000,
+                                  temporal_resolution=60)
+
+# Calculate the positions
+track1.calculate_ground_swath()
+
 # # Save the track
 # track.save(file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/track1")
 
@@ -102,14 +102,14 @@ times = campaign.get_five_tracks()
 #                                              file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/"
 #                                                        "files/track5")
 #
-# # Define a projection
-# projection = pet.projections.biaxialProjections.biaxialCylindrical(name="biaxial cylindrical",
-#                                                                    folder_path="/home/user/Documents/GitHub/"
-#                                                                    "Planetary-Exploration-Tool/figs")
-# # Plot the track
-# fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
-#
-# track1.visualize_swath(projection=projection, fig=fig, ax=ax, globe=globe)
+# Define a projection
+projection = pet.projections.biaxialProjections.biaxialCylindrical(name="biaxial cylindrical",
+                                                                   folder_path="/home/user/Documents/GitHub/"
+                                                                   "Planetary-Exploration-Tool/figs")
+# Plot the track
+fig, ax, globe = planet.visualize_topography(projection=projection, return_fig=True)
+
+track1.visualize_swath(projection=projection, fig=fig, ax=ax, globe=globe)
 
 fm.clear()
 

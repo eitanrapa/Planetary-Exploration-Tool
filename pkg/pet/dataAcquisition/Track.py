@@ -215,65 +215,43 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         # Get positions and velocities of the satellite for the observation times
         satellite_positions, satellite_velocities = self.campaign.get_states(times=time_space)
 
-        print("Calculating SPICE planes...", file=sys.stderr)
+        # Normalize the velocity and position vectors
+        vhats = np.asarray([satellite_velocity / np.linalg.norm(satellite_velocity)
+                            for satellite_velocity in satellite_velocities])
+        rhats = np.asarray([sat_position / np.linalg.norm(sat_position)
+                            for sat_position in satellite_positions])
 
-        # Create the SPICE planes with the normal as the satellite velocities originating at planet center
-        planes = spice.nvp2pl_vector(normal=satellite_velocities, point=[0, 0, 0])
+        # Get the azimuthal unit vectors
+        # Use radial direction instead of projection (more stable)
+        u1s = [-rhat for rhat in rhats]  # radially inward
 
-        print("Calculating SPICE ellipses...", file=sys.stderr)
-
-        # Calculate SPICE ellipses that intercept the SPICE planes with planet triaxial ellipsoid.
-        ellipses = spice.inedpl_vector(a=a, b=b, c=c, plane=planes)[0]
-
-        print("Calculating generating vectors...", file=sys.stderr)
-
-        # Get the generating vectors for the SPICE ellipses
-        centers, smajors, sminors = spice.el2cgv_vector(ellipse=ellipses)
-
-        # Get the angles to iterate through for the spanning vectors
-        thetas = np.linspace(np.pi, -np.pi, num=num_theta, endpoint=False)[::-1]
+        if self.instrument.look_direction == "right":
+            u2s = [-np.cross(vhat, u1) for vhat, u1 in zip(vhats, u1s)]
+        elif self.instrument.look_direction == "left":
+            u2s = [np.cross(vhat, u1) for vhat, u1 in zip(vhats, u1s)]
+        else:
+            raise ValueError("Invalid look direction. Must be 'left' or 'right'.")
+        u2s = [u2 / np.linalg.norm(u2) for u2 in u2s]
 
         swath_beams = []
 
         # Iterate through each azimuthal beam
         for i in tqdm(range(len(time_space)), desc="Calculating planet surface intersects..."):
 
-            # Create the vectors per temporal point
-            vectors = [np.cos(theta) * smajors[i] + np.sin(theta) * sminors[i] for theta in thetas]
+            ray_dirs = [np.cos(np.deg2rad(theta)) * u1s[i] + np.sin(np.deg2rad(theta)) * u2s[i]
+                        for theta in np.linspace(self.instrument.start_look_angle,
+                                                 self.instrument.end_look_angle, num_theta)]
 
             # Get the intersects with the planet DSK
-            intersects = self.planet.get_surface_intersects(vectors=vectors)
+            intersects = self.planet.get_surface_intersects(vertex=satellite_positions[i], raydirs=ray_dirs)
 
             # Make groundTarget objects with the intersects
-            swath_beams.append([[intersect[0], intersect[1], intersect[2]] for intersect in intersects])
-
-        # Calculate the relative positions of each GroundTarget for each beam
-        relative_positions = self.point_positions_relative_to_satellite(swath_beams=swath_beams,
-                                                                        satellite_positions=satellite_positions,
-                                                                        satellite_velocities=satellite_velocities)
+            swath_beams.append([[intersect[0], intersect[1], intersect[2]] for intersect in intersects
+                                if intersect[0] is not np.nan])
 
         # Calculate the look angle of each GroundTarget for each beam
         look_angles = self.get_angles_cartesian(swath_beams=swath_beams,
                                                 times=time_space, satellite_positions=satellite_positions)
-
-        # Calculate if the positions of the GroundTargets are past the limb point
-        limb_checks = self.check_limbs(swath_beams=swath_beams, satellite_positions=satellite_positions)
-
-        # Check the beams for off-limb, look_angles, and relative positions
-        for i in range(len(swath_beams)):
-
-            indices = []
-            for j in range(len(swath_beams[i])):
-
-                # Check if the look angle and relative position is correct
-                if ((self.instrument.start_look_angle < look_angles[i][j] < self.instrument.end_look_angle)
-                        and (relative_positions[i][j] == self.instrument.look_direction) and limb_checks[i][j] == 0):
-                    # Append the groundTarget to azimuthal beam
-                    indices.append(j)
-
-            # Replace previous beam with all accepted points
-            swath_beams[i] = [swath_beams[i][index] for index in indices]
-            look_angles[i] = [look_angles[i][index] for index in indices]
 
         cartesian_positions = np.asanyarray([coord for sublist in swath_beams for coord in sublist])
         flat_angles = np.asarray([angle for sublist in look_angles for angle in sublist])
@@ -284,89 +262,6 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         self.create_data_array(cartesian_coordinates=cartesian_positions, geodetic_coordinates=swath_coordinates,
                                look_angles=flat_angles, times=flat_times)
 
-    def check_limbs(self, swath_beams, satellite_positions):
-        """
-        Check if all the swath_beam rays from satellite to surface positions intersect the limb ellipse.
-        :param swath_beams: Azimuthal beams of the swath
-        :param satellite_positions: Array of x, y, z, positions of the satellite [m]
-        :return: A list of values whether the points on the ground are before or after the limb point.
-        """
-
-        # Get planet axes
-        a, b, c = self.planet.get_axes()
-
-        # Get the limb ellipses from satellite positions
-        limb_ellipses = spice.edlimb_vector(a=a, b=b, c=c, viewpt=satellite_positions)
-
-        # Get the generating vectors for the SPICE ellipses
-        centers, smajors, sminors = spice.el2cgv_vector(ellipse=limb_ellipses)
-
-        # Get planes generated by spanning vectors
-        planes = spice.psv2pl_vector(point=centers, span1=smajors, span2=sminors)
-
-        # Iterate through the beams
-        intersect_booleans_per_beam = []
-        for i in tqdm(range(len(swath_beams)), desc="Checking limb points..."):
-
-            # Get the surface positions per beam
-            surface_positions = np.asarray([(point[0], point[1], point[2]) for point in swath_beams[i]])
-
-            # Calculate vectors from satellite to point and the satellite's direction
-            vectors_to_sat = satellite_positions[i] - surface_positions
-
-            # Get intersect values
-            intersect_values = spice.inrypl_vector(vertex=surface_positions, dir=vectors_to_sat, plane=planes[i])[0]
-
-            # Append the intersects
-            intersect_booleans_per_beam.append(intersect_values)
-
-        # Return the intersections in a 2D array
-        return intersect_booleans_per_beam
-
-    def point_positions_relative_to_satellite(self, swath_beams, satellite_positions, satellite_velocities):
-        """
-        Determine whether a set of points on the surface of the Earth are to the left or right of the satellite's
-        velocity vectors
-        :param swath_beams: Azimuthal beams of the swath
-        :param satellite_positions: Array of x, y, z, positions of the satellite [m]
-        :param satellite_velocities: Array of x, y, z, velocity vectors of the satellite [m/s]
-        :return: A list containing whether the points are to the left or right of their corresponding satellite velocity
-        vector
-        """
-
-        # Iterate through the beams
-        relative_positions_per_beam = []
-        for i in tqdm(range(len(swath_beams)), desc="Calculating relative positions..."):
-
-            # Get surface positions per beam
-            surface_positions = np.asarray([(point[0], point[1], point[2]) for point in swath_beams[i]])
-
-            # Calculate vectors from satellite to point and the satellite's direction
-            vectors_to_point = surface_positions - satellite_positions[i]
-
-            # Calculate the cross products of the vectors
-            # noinspection PyUnreachableCode
-            cross_products = np.cross(satellite_velocities[i], vectors_to_point)
-
-            # Project cross_products onto corresponding radial vector
-            radial_vector = satellite_positions[i] / np.linalg.norm(satellite_positions[i])
-            projections = np.dot(cross_products, radial_vector)
-
-            # Determine the position of the point relative to the satellite
-            relative_positions = []
-            for projection in projections:
-
-                if projection > 0:
-                    relative_positions.append("left")
-
-                elif projection < 0:
-                    relative_positions.append("right")
-
-            # Append the relative position
-            relative_positions_per_beam.append(relative_positions)
-
-        # Return the relative position 2-D array
-        return relative_positions_per_beam
 
     def get_angles_cartesian(self, swath_beams, times, satellite_positions):
         """
