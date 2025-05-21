@@ -2,6 +2,11 @@
 
 *~
 
+*.png
+
+*.bsp
+
+
 # machine-dependent config
 /.mm/config.def
 
@@ -19,5 +24,9 @@
 
 # pycharm
 /.idea
+
+/.png
+
+/.bsp
 
 # end of file

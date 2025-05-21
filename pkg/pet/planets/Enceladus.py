@@ -6,11 +6,13 @@
 
 import pet
 import cspyce as spice
+import spiceypy as spice2
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LightSource
 from scipy.interpolate import griddata
-import cartopy.crs as ccrs
+import cartopy.crs as ccrs#
+import pdb
 
 
 class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.protocols.planet):
@@ -89,6 +91,88 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
             except ValueError:
                 # If not, append NaN
                 intersects.append([np.nan, np.nan, np.nan])
+
+        # Convert to meters
+        intersects = np.asanyarray(intersects) * 1e3
+
+        # Return the intersects
+        return intersects
+    
+
+    @pet.export
+    def get_surface_intercept_LoS(self, pSat, LoSs):
+        # Retrieve the DSK handle
+        handle = spice.kdata(which=0, kind="dsk")[3]
+
+        # Retrieve the DSK DLA
+        dla = spice.dlabfs(handle=handle)
+
+        # get intersects
+        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=pSat, raydir= LoS)[1] for
+                      LoS in LoSs]
+        intersects = np.asanyarray(intersects) * 1e3
+
+        # get plate ids for normal vector and get normal vector of plate
+        plate_ids = [spice.dskx02(handle=handle, dladsc=dla, vertex=pSat, raydir= LoS)[0] for
+                      LoS in LoSs]
+        normal = [spice.dskn02(handle, dla, plate_id) for plate_id in plate_ids]
+        normal = np.asanyarray(normal)
+
+        #project normal vector on incidence plane
+        LoS_norm = LoSs / np.linalg.norm(LoSs, axis=-1)[:,np.newaxis]
+        plane_normalVec = np.cross(-pSat, LoS_norm)
+        plane_normalVec = plane_normalVec/np.linalg.norm(plane_normalVec, axis=-1)[:,np.newaxis]
+        normal_perp = np.sum(normal*plane_normalVec, axis=-1)[:,np.newaxis] * plane_normalVec
+        normal_proj = normal - normal_perp
+        normal_proj = normal_proj/np.linalg.norm(plane_normalVec, axis=-1)[:,np.newaxis]
+
+        # get local incident angle
+        incAngles = np.arccos(np.sum(-LoS_norm * normal_proj, axis=1))
+
+        # Return the intersects and incident angles
+        return intersects, incAngles
+
+    @pet.export
+    def get_height_above_surface(self, points):
+        """
+        Find the intersects of a set of vectors with the planet DSK
+        :param vectors: Vectors for which to find intersects
+        :return: The x, y, z intersects of the vectors with the DSK [m]
+        """
+
+        # Retrieve the DSK handle
+        handle = spice.kdata(which=0, kind="dsk")[3]
+
+        # Retrieve the DSK DLA
+        dla = spice.dlabfs(handle=handle)
+
+        # Use the SPICE toolkit to calculate the intersects
+        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=point, raydir= -1*point)[1] for
+                      point in points]
+
+        # Convert to meters
+        intersects = np.asanyarray(intersects) * 1e3
+
+        # Return the intersects
+        return np.linalg.norm(intersects-points,axis=1)
+    
+    @pet.export
+    def get_closest_point(self, points):
+        """
+        Find the intersects of a set of vectors with the planet DSK
+        :param vectors: Vectors for which to find intersects
+        :return: The x, y, z intersects of the vectors with the DSK [m]
+        """
+
+        # Retrieve the DSK handle
+        handle = spice.kdata(which=0, kind="dsk")[3]
+
+        # Retrieve the DSK DLA
+        dla = spice.dlabfs(handle=handle)
+
+        # Use the SPICE toolkit to calculate the intersects
+        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=point, raydir= -1*point)[1] for
+                      point in points]
 
         # Convert to meters
         intersects = np.asanyarray(intersects) * 1e3

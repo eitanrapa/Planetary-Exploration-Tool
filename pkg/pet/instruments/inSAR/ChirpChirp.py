@@ -6,6 +6,7 @@
 # (c) 2023-2025 all rights reserved
 
 import numpy as np
+import pdb
 import pet
 from scipy.interpolate import RegularGridInterpolator
 import scipy.constants as const
@@ -21,7 +22,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     wavelength.doc = "radar instrument wavelength [m]"
 
     look_angle = pet.properties.float()
-    look_angle.default = 25
+    look_angle.default = 23.5
     look_angle.doc = "look angle of the radar instrument"
 
     antenna_length = pet.properties.float()
@@ -80,12 +81,17 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         super().__init__(**kwargs)
 
         # Calculate the beamwidth
+<<<<<<< HEAD
         d_inv = 1 / self.antenna_height
         self.bw = np.rad2deg(np.arcsin(d_inv * self.wavelength))
+=======
+        d_inv = 1 / self.antenna_elevation_width
+        self.bw = np.rad2deg(d_inv * self.wavelength)
+>>>>>>> dev-andi
 
         # Calculate the start and end look angles
-        self.start_look_angle = self.look_angle - self.bw
-        self.end_look_angle = self.look_angle + self.bw
+        self.start_look_angle = self.look_angle - self.bw/2
+        self.end_look_angle = self.look_angle + self.bw/2 
 
         return
 
