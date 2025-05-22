@@ -2,7 +2,6 @@
 # Planetary-Exploration-Tool (PET)
 
 - Ground swaths calculated through look angle geometry instead of maximum incidence angle
-- For ground intersects, nadir is sweeped instead of plane perpendicular to the velocity
 - No SAR unwrapping error included
 - Only works for repeat ground track orbits, otherwise we would have to do georeferencing to match swaths
 - Plotting projections assuming biaxial ellipsoids

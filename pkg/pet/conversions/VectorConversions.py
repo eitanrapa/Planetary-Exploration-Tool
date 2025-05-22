@@ -16,7 +16,8 @@ class VectorConversions(pet.component, family="pet.conversions.vectorConversions
     Class that encapsulates conversions between ENU and Cartesian vectors
     """
 
-    def _enu_to_cartesian_vector(self, enu_vectors, latitudes, longitudes):
+    @staticmethod
+    def _enu_to_cartesian_vector(enu_vectors, latitudes, longitudes):
         """
         Function that converts between local east, north, up vectors and ellipsoidal center x, y, z vectors.
         Also needs local coordinates.
@@ -77,7 +78,8 @@ class VectorConversions(pet.component, family="pet.conversions.vectorConversions
         else:
             return cartesian_vectors
 
-    def _cartesian_to_enu_vector(self, uvw_vectors, latitudes, longitudes):
+    @staticmethod
+    def _cartesian_to_enu_vector(uvw_vectors, latitudes, longitudes):
         """
         Convert Cartesian coordinates (u, v, w) back to ENU coordinates (east, north, up).
         Also needs local coordinates.
@@ -136,25 +138,22 @@ class VectorConversions(pet.component, family="pet.conversions.vectorConversions
         else:
             return enu_vectors
 
-    def enu_to_cartesian_cubes(self, east_cube, north_cube, up_cube, latitudes, longitudes):
+    @staticmethod
+    def _enu_to_cartesian_cubes(east_cube, north_cube, up_cube, latitudes, longitudes):
         """
         Function that converts between local east, north, up vectors and ellipsoidal center x, y, z vectors.
         Also needs local coordinates.
         :param east_cube: local east pointing cube
         :param north_cube: local north pointing cube
         :param up_cube: local up pointing cube
-        :param latitudes: local latitude of points
-        :param longitudes: local longitude of points
+        :param latitudes: local latitude of points (deg)
+        :param longitudes: local longitude of points (deg)
         :return: u, v, w vector
         """
 
-        # Convert longitude and latitude to radians
-        longitude = np.deg2rad(longitudes)
-        latitude = np.deg2rad(latitudes)
-
         # Reshape longitudes and latitudes for broadcasting
-        longitude = longitude[:, np.newaxis, np.newaxis]
-        latitude = latitude[np.newaxis, :, np.newaxis]
+        longitude = longitudes[:, np.newaxis, np.newaxis]
+        latitude = latitudes[np.newaxis, :, np.newaxis]
 
         # Calculate vector transformation
         t = np.cos(latitude) * up_cube - np.sin(latitude) * north_cube
@@ -162,7 +161,25 @@ class VectorConversions(pet.component, family="pet.conversions.vectorConversions
         u = np.cos(longitude) * t - np.sin(longitude) * east_cube
         v = np.sin(longitude) * t + np.cos(longitude) * east_cube
 
+        # Return the transformations
+        return u, v, w
+
+    def enu_to_cartesian_cubes(self, east_cube, north_cube, up_cube, latitudes, longitudes):
+        """
+        Helper function for _enu_to_cartesian_cubes
+        """
+
+        # Convert longitude and latitude to radians
+        longitudes = np.deg2rad(longitudes)
+        latitudes = np.deg2rad(latitudes)
+
+        u, v, w = self._enu_to_cartesian_cubes(east_cube=east_cube, north_cube=north_cube, up_cube=up_cube,
+                                               latitudes=latitudes, longitudes=longitudes)
+
+        # Turn into numpy array
+        new_cubes = np.asarray([u, v, w])
+
         # Return the vector
-        return np.asarray([u, v, w])
+        return new_cubes
 
 # end of file

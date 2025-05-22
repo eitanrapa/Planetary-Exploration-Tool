@@ -59,10 +59,11 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
         # Return the retrieved values
         return colatitudes, longitudes, times, cycle_time, east_cube, north_cube, up_cube
 
-    def get_displacements(self, track):
+    def get_displacements(self, track, time_difference=0):
         """
         Get surface displacements for the positions defined by a track
         :param track: object for which to find displacements for longitudes and latitudes
+        :param time_difference: time difference to add to the time of the track
         :return: displacements in local cartesian vectors
         """
 
@@ -90,7 +91,7 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
         # Access longitude and latitude coordinates
         longitudes = track.data["longitude"].values
         latitudes = track.data["latitude"].values
-        time_space = track.data["time"].values
+        time_space = track.data["time"].values + time_difference
 
         # Convert longitudes to 0 - 360 format
         modified_longs = np.asarray(longitudes) % 360
@@ -158,7 +159,7 @@ class TidalDeformationMap(pet.component, family="pet.natureSimulations.geophysic
             time_series = interpolator((point[1] % 360, point[0], time_values))
 
             # Fit the sine function to the data
-            popt, pcov = curve_fit(f=sine_func, xdata=time_values, ydata=time_series, p0=(1, 1))
+            popt, pcov = curve_fit(f=sine_func, xdata=time_values, ydata=time_series, p0=(1, 1))[:2]
 
             # Extract the fitted parameters
             a_fit, phi_fit = popt

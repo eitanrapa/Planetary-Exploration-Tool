@@ -65,10 +65,10 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         return np.asarray([a, b, c])
 
     @pet.export
-    def get_surface_intersects(self, vertex, raydirs):
+    def get_surface_intersects_local_angles(self, satellite_position, raydirs):
         """
         Find the intersects of a set of vectors with the planet DSK
-        :param vertex: Vectors for which to find intersects
+        :param satellite_position: Satellite position in the body-fixed reference frame [m]
         :param raydirs: The directions of the vectors
         :return: The x, y, z intersects of the vectors with the DSK [m]
         """
@@ -79,22 +79,79 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         # Retrieve the DSK DLA
         dla = spice.dlabfs(handle=handle)
 
-        intersects = []
+        total_intersects = []
+        total_plates = []
 
         # Use the SPICE toolkit to calculate the intersects
         for raydir in raydirs:
             # Check if intersect exists
             try:
-                intersects.append(spice.dskx02(handle=handle, dladsc=dla, vertex=vertex*1e-3, raydir=raydir)[1])
+                plate_ids, intersects = spice.dskx02(handle=handle, dladsc=dla,
+                                                     vertex=satellite_position*1e-3, raydir=raydir)[:2]
+                total_plates.append(plate_ids)
+                total_intersects.append(intersects)
             except ValueError:
-                # If not, append NaN
-                intersects.append([np.nan, np.nan, np.nan])
+                # If not, do nothing
+                pass
+
+        # Convert to meters
+        intersects = np.asarray(total_intersects) * 1e3
+
+        # Calculate incidence angles
+        normals = [spice.dskn02(handle, dla, plate_id) for plate_id in total_plates]
+        normals = np.asarray(normals)
+
+        # Project normal vector on incidence plane
+        line_of_sight_norms = raydirs / np.linalg.norm(raydirs, axis=-1)[:, np.newaxis]
+        plane_normal_vectors = np.cross(-satellite_position, line_of_sight_norms)
+
+        # Normalize
+        plane_normal_vectors = plane_normal_vectors / np.linalg.norm(plane_normal_vectors, axis=-1)[:, np.newaxis]
+
+        # Normal projections
+        normal_perps = np.sum(normals * plane_normal_vectors, axis=-1)[:, np.newaxis] * plane_normal_vectors
+        normal_projs = normals - normal_perps
+        normal_projs = normal_projs / np.linalg.norm(plane_normal_vectors, axis=-1)[:, np.newaxis]
+
+        # get local incident angle
+        incidence_angles = np.arccos(np.sum(-line_of_sight_norms * normal_projs, axis=1))
+        incidence_angles = np.degrees(incidence_angles)
+
+        # Get the look angles by calculating the angle between the satellite position vector and the
+        # satellite position to intersect vector
+        vector_to_intersects = intersects - satellite_position
+        vector_to_intersects = vector_to_intersects / np.linalg.norm(vector_to_intersects, axis=-1)[:, np.newaxis]
+        look_angles = np.arccos(np.sum(-satellite_position * vector_to_intersects, axis=1))
+
+        # Return the intersects, incidence angles, and look angles
+        return intersects, incidence_angles, look_angles
+
+    @pet.export
+    def get_closest_point_to_surface(self, points):
+        """
+        Get the closest intersect of a point with the planet and the distance to the surface
+        :param points: Points to calculate the closest intersect with the DSK [m]
+        :return: The x, y, z intersects of the vectors with the DSK [m] and the distance to the surface [m]
+        """
+
+        # Retrieve the DSK handle
+        handle = spice.kdata(which=0, kind="dsk")[3]
+
+        # Retrieve the DSK DLA
+        dla = spice.dlabfs(handle=handle)
+
+        # Use the SPICE toolkit to calculate the intersects
+        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=point, raydir=-1 * point)[1] for
+                      point in points]
 
         # Convert to meters
         intersects = np.asanyarray(intersects) * 1e3
 
-        # Return the intersects
-        return intersects
+        # Get the distance
+        distances = np.linalg.norm(intersects - points, axis=1)
+
+        # Return the intersects and distances
+        return intersects, distances
 
     @pet.export
     def get_sub_obs_points(self, times, campaign):
