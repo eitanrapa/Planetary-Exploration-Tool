@@ -58,15 +58,15 @@ orbit_cycle_time = campaign.orbit_cycle
 
 # Get the track
 track = pet.dataAcquisition.track(name="track", start_time=times[0], end_time=times[0] + 60*90, planet=planet,
-                                  campaign=campaign, instrument=instrument, spatial_resolution=500,
-                                  temporal_resolution=10, interpol2FinalRes=1, interferogram_resolution_az=500,
-                                  interferogram_resolution_rg=500)
+                                  campaign=campaign, instrument=instrument, spatial_resolution=700,
+                                  temporal_resolution=20, interpol2FinalRes=1, interferogram_resolution_az=700,
+                                  interferogram_resolution_rg=700)
 track.calculate_ground_swath_new()
 
 
 
 # Specify the baseline
-baseline = 15.
+baseline = 200.
 # Specify the basline uncertainty
 baseline_uncertainty = 0.
 # Specify the baseline orientation (roll=0 means horizontal)
@@ -118,6 +118,33 @@ im = ax2.scatter(longitudes, latitudes, cmap=cm,
 plt.colorbar(im, fraction=0.02, pad=0.1)
 plt.title('measured height [m]', pad=12)
 plt.savefig('height_meas.png', format='png',dpi=300,bbox_inches="tight")
+
+fig3, ax3, globe3 = projection.proj(planet=planet)
+# Make the colormap cyclical
+cm = plt.cm.get_cmap('Spectral')
+im = ax3.scatter(longitudes, latitudes, cmap=cm,
+                transform=ccrs.PlateCarree(globe=globe3), c=10*np.log10(interferogram.NESN), s=0.01,marker=',')
+plt.colorbar(im, fraction=0.02, pad=0.1)
+plt.title('NESN [dB]', pad=12)
+plt.savefig('NESN.png', format='png',dpi=300,bbox_inches="tight")
+
+fig4, ax4, globe4 = projection.proj(planet=planet)
+# Make the colormap cyclical
+cm = plt.cm.get_cmap('Spectral')
+im = ax4.scatter(longitudes, latitudes, cmap=cm,
+                transform=ccrs.PlateCarree(globe=globe4), c=interferogram.corr_tot, s=0.01,marker=',')
+plt.colorbar(im, fraction=0.02, pad=0.1)
+plt.title('total decorrelation []', pad=12)
+plt.savefig('coherence.png', format='png',dpi=300,bbox_inches="tight")
+
+fig5, ax5, globe5 = projection.proj(planet=planet)
+# Make the colormap cyclical
+cm = plt.cm.get_cmap('Spectral')
+im = ax5.scatter(longitudes, latitudes, cmap=cm,
+                transform=ccrs.PlateCarree(globe=globe5), c=interferogram.sigma_phase, s=0.01,marker=',')
+plt.colorbar(im, fraction=0.02, pad=0.1)
+plt.title('phase standard deviation [rad]', pad=12)
+plt.savefig('phase_std.png', format='png',dpi=300,bbox_inches="tight")
 #------------------------------------------------------------------------------
 
 

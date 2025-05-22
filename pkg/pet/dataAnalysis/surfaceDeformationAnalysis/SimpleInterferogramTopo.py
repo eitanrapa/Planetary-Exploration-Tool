@@ -259,6 +259,27 @@ class SimpleInterferogramTopo(pet.component, family="pet.dataAnalysis.surfaceDef
         distances2 = np.linalg.norm(positions - satellite_positions2, axis=-1)
         phase_topo_forward = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2 - distances1)
 
+        #compute performance and noise-----------------------------------------
+        print("     Get performance and noise...", file=sys.stderr)
+        # get b_perp
+        b_vec = satellite_positions2 - satellite_positions1
+        LoS = positions - satellite_positions1
+        LoS = LoS / np.linalg.norm(LoS, axis=-1)[:,np.newaxis]
+        b_perp_vec = b_vec - np.sum(b_vec*LoS, axis=-1)[:,np.newaxis] * LoS
+        b_perp = np.linalg.norm(b_perp_vec, axis=-1)
+        # get look angle
+        nadir_norm = -satellite_positions1/np.linalg.norm(satellite_positions1,axis=-1)[:,np.newaxis]
+        look_ang = np.arccos(np.sum(LoS * nadir_norm, axis=-1))
+        #get performance
+        self.sigma_phase, self.corr_tot, self.Nlooks, self.NESN = self.instrument.get_instrument_noise(planet=self.planet,
+                                             baseline=b_perp,
+                                             satellite_velocity=satellite_velocity1,
+                                             look_angles=look_ang,
+                                             incidence_angles=self.track.data.values,
+                                             distances=distances1)
+        #----------------------------------------------------------------------
+
+
         print("     Start InSAR inversion...", file=sys.stderr)
         print("     .....................", file=sys.stderr)
 
@@ -289,7 +310,6 @@ class SimpleInterferogramTopo(pet.component, family="pet.dataAnalysis.surfaceDef
 
         #here would come the phase unwrapping....
 
-        
         phase_absolut = phase_flat + phase_ref
 
         print("        Do exact InSAR height computation...", file=sys.stderr)

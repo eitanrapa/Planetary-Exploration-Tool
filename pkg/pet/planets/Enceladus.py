@@ -41,7 +41,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     surface_backscatter.doc = "The surface backscatter of Enceladus [dB]"
 
     radar_penetration_depth = pet.properties.float()
-    radar_penetration_depth.default = 15
+    radar_penetration_depth.default = 30
     radar_penetration_depth.doc = "The radar penetration depth of Enceladus [m]"
 
     surface_permittivity = pet.properties.float()

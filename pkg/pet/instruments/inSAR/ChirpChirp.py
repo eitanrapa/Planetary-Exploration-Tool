@@ -7,6 +7,8 @@
 
 import numpy as np
 import pdb
+import matplotlib.pyplot as plt
+import sys
 import pet
 from scipy.interpolate import RegularGridInterpolator
 import scipy.constants as const
@@ -53,6 +55,14 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     pulse_repetition_frequency.default = 500
     pulse_repetition_frequency.doc = "pulse repetition frequency of the radar instrument [Hz]"
 
+    az_bandwidth_proc = pet.properties.float()
+    az_bandwidth_proc.default = 64
+    az_bandwidth_proc.doc = "processed azimuth bandwidth [Hz]"
+
+    az_resolution_proc = pet.properties.float()
+    az_resolution_proc.default = 1
+    az_resolution_proc.doc = "processed azimuth resolution [m]"
+
     noise_figure = pet.properties.float()
     noise_figure.default = 3
     noise_figure.doc = "noise figure of the radar instrument [dB]"
@@ -81,13 +91,8 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         super().__init__(**kwargs)
 
         # Calculate the beamwidth
-<<<<<<< HEAD
         d_inv = 1 / self.antenna_height
-        self.bw = np.rad2deg(np.arcsin(d_inv * self.wavelength))
-=======
-        d_inv = 1 / self.antenna_elevation_width
         self.bw = np.rad2deg(d_inv * self.wavelength)
->>>>>>> dev-andi
 
         # Calculate the start and end look angles
         self.start_look_angle = self.look_angle - self.bw/2
@@ -112,29 +117,33 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         kB = const.k  # Boltzman constant
 
         # Derived quantities
-        SLC_res = [1, c0 / (2 * self.range_bandwidth)]  # resolution of SAR image [azimuth, range] [m]
-        azBw_beam = float(2 * satellite_velocity / self.wavelength *
-                          np.sin(self.wavelength / self.antenna_length))  # Doppler bandwidth
+        SLC_res = [self.az_resolution_proc, c0 / (2 * self.range_bandwidth)]  # resolution of SAR image [azimuth, range] [m]
+        # azBw_beam = float(2 * satellite_velocity / self.wavelength *
+        #                   np.sin(self.wavelength / self.antenna_length))  # Doppler bandwidth
         ground_range_res = SLC_res[1] / np.sin(incidence_angles)  # ground range resolution
 
         # get 2-D antenna pattern and corresponding azimuth and elevation angles
         az_axis, el_axis, pattern2D = self.getAntennaPattern(wvlength=self.wavelength, lenAz=self.antenna_length,
-                                                             lenEl=self.antenna_length,
-                                                             efficiency=self.antenna_efficiency)
+                                                             lenEl=self.antenna_height,
+                                                             efficiency=10**(self.antenna_efficiency/10))
 
+        print("        Max. antenna gain is " + str(20*np.log10(np.max(pattern2D))) + "...", file=sys.stderr)
         losses_dB = 1.5 + self.power_margin  # losses [dB]
         losses = 10 ** (losses_dB / 10)
+        
 
         # compute the noise equivalent sigma naught
-        NESN = self.computeNESN(incAng=incidence_angles, slant_range=distances, elevAng=look_angles,
+        NESN = self.computeNESN(incAng=incidence_angles, slant_range=distances, elevAng=look_angles-np.deg2rad(self.look_angle),
                                 wvlength=self.wavelength, peakPower=self.peak_power, chirpDuration=self.pulse_duration,
-                                PRF=self.pulse_repetition_frequency, rangeBw=self.range_bandwidth, doppBw=azBw_beam,
-                                vSat=satellite_velocity, noiseFigure=10**(self.noise_figureB/10), losses=losses,
+                                PRF=self.pulse_repetition_frequency, rangeBw=self.range_bandwidth, doppBw=self.az_bandwidth_proc,
+                                vSat=np.mean(satellite_velocity), noiseFigure=10**(self.noise_figure/10), losses=losses,
                                 patTx2D=pattern2D, patRx2D=pattern2D, az_axis=az_axis, el_axis=el_axis, k_Boltz=kB,
                                 noiseTemp=self.receiver_noise_temperature, Naux=256, dopplerCentroid=0,  c0=c0)
+        print("        Mean NESN is " + str(10*np.log10(np.mean(NESN))) + "...", file=sys.stderr)
 
         # compute the SNR
         SNR = self.nesn2snr(nesn=NESN, sigma0=10**(planet.surface_backscatter/10))
+        print("        Mean SNR is " + str(10*np.log10(np.mean(SNR))) + "...", file=sys.stderr)
 
         # compute all relevant decorrelation sources
         corr_thermal = self.thermalCorrelation(SNR=SNR)
@@ -146,15 +155,24 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
 
         # compute the total correlation
         corr_tot = corr_thermal * corr_basline * corr_volume
+        print("        Mean thermal decorrelation is " + str(np.mean(corr_thermal)) + "...", file=sys.stderr)
+        print("        Mean baseline decorrelation is " + str(np.mean(corr_basline)) + "...", file=sys.stderr)
+        print("        Mean volume decorrelation is " + str(np.mean(corr_volume)) + "...", file=sys.stderr)
+        print("        Mean total decorrelation is " + str(np.mean(corr_tot)) + "...", file=sys.stderr)
 
+        
         # compute the available number of looks to average the interferogram
-        Nlooks = ((self.processing_ground_range_resolution[1] / ground_range_res) *
-                  (self.processing_azimuth_resolution[0] / SLC_res[0]))
+        Nlooks = ((self.processing_ground_range_resolution / ground_range_res) *
+                  (self.processing_azimuth_resolution / SLC_res[0]))
+
+        print("        Mean number of looks is " + str(np.mean(Nlooks)) + "...", file=sys.stderr)
 
         # compute the standard deviation of the phase of the interferogram
         sigma_phase = self.coherence2phasenoise(coherence=corr_tot, effectiveLooks=Nlooks)
 
-        return sigma_phase, corr_tot, Nlooks
+        print("        Mean phase standard deviation is " + str(np.mean(sigma_phase)) + "...", file=sys.stderr)
+
+        return sigma_phase, corr_tot, Nlooks, NESN
 
     def thermalCorrelation(self, SNR):
         thermal_corr = (1 / (1 + 1 / SNR))
