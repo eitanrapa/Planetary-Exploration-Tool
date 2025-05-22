@@ -16,6 +16,7 @@
 # the default build locations (cmake)
 /build
 
+/data
 # mac folder attributes 
 **.DS_Store
 
