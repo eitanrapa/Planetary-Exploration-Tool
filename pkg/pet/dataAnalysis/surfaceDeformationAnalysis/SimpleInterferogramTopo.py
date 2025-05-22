@@ -271,12 +271,17 @@ class SimpleInterferogramTopo(pet.component, family="pet.dataAnalysis.surfaceDef
         nadir_norm = -satellite_positions1/np.linalg.norm(satellite_positions1,axis=-1)[:,np.newaxis]
         look_ang = np.arccos(np.sum(LoS * nadir_norm, axis=-1))
         #get performance
-        self.sigma_phase, self.corr_tot, self.Nlooks, self.NESN = self.instrument.get_instrument_noise(planet=self.planet,
+        self.sigma_phase, self.corr_tot, self.Nlooks, self.NESN, self.sigma0 = self.instrument.get_instrument_noise(planet=self.planet,
                                              baseline=b_perp,
                                              satellite_velocity=satellite_velocity1,
                                              look_angles=look_ang,
                                              incidence_angles=self.track.data.values,
                                              distances=distances1)
+        print("     Adding noise to interferogram...", file=sys.stderr)
+        noise = np.random.normal(np.zeros(len(self.sigma_phase)), self.sigma_phase)
+        print("        Noise mean meas:"+str(np.mean(noise))+"...", file=sys.stderr)
+        print("        Noise std meas:"+str(np.std(noise))+"...", file=sys.stderr)
+        phase_topo_forward += noise
         #----------------------------------------------------------------------
 
 

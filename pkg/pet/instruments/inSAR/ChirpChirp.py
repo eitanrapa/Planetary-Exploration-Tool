@@ -28,7 +28,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     look_angle.doc = "look angle of the radar instrument"
 
     antenna_length = pet.properties.float()
-    antenna_length.default = 3.5
+    antenna_length.default = 2.
     antenna_length.doc = "antenna length (azimuth) [m]"
 
     antenna_height = pet.properties.float()
@@ -48,11 +48,11 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     peak_power.doc = "peak power of the radar instrument [W]"
 
     pulse_duration = pet.properties.float()
-    pulse_duration.default = 60 * 1e-6  # 60 microseconds
+    pulse_duration.default = 111 * 1e-6  # 60 microseconds
     pulse_duration.doc = "pulse duration of the radar instrument [s]"
 
     pulse_repetition_frequency = pet.properties.float()
-    pulse_repetition_frequency.default = 500
+    pulse_repetition_frequency.default = 450
     pulse_repetition_frequency.doc = "pulse repetition frequency of the radar instrument [Hz]"
 
     az_bandwidth_proc = pet.properties.float()
@@ -130,19 +130,20 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         print("        Max. antenna gain is " + str(20*np.log10(np.max(pattern2D))) + "...", file=sys.stderr)
         losses_dB = 1.5 + self.power_margin  # losses [dB]
         losses = 10 ** (losses_dB / 10)
-        
 
+        vel = np.mean(np.linalg.norm(satellite_velocity, axis=-1))
         # compute the noise equivalent sigma naught
         NESN = self.computeNESN(incAng=incidence_angles, slant_range=distances, elevAng=look_angles-np.deg2rad(self.look_angle),
                                 wvlength=self.wavelength, peakPower=self.peak_power, chirpDuration=self.pulse_duration,
                                 PRF=self.pulse_repetition_frequency, rangeBw=self.range_bandwidth, doppBw=self.az_bandwidth_proc,
-                                vSat=np.mean(satellite_velocity), noiseFigure=10**(self.noise_figure/10), losses=losses,
+                                vSat=vel, noiseFigure=10**(self.noise_figure/10), losses=losses,
                                 patTx2D=pattern2D, patRx2D=pattern2D, az_axis=az_axis, el_axis=el_axis, k_Boltz=kB,
                                 noiseTemp=self.receiver_noise_temperature, Naux=256, dopplerCentroid=0,  c0=c0)
         print("        Mean NESN is " + str(10*np.log10(np.mean(NESN))) + "...", file=sys.stderr)
 
         # compute the SNR
-        SNR = self.nesn2snr(nesn=NESN, sigma0=10**(planet.surface_backscatter/10))
+        sigma0 = 3.51*np.cos(incidence_angles)**1.23#10**(planet.surface_backscatter/10)
+        SNR = self.nesn2snr(nesn=NESN, sigma0=sigma0)
         print("        Mean SNR is " + str(10*np.log10(np.mean(SNR))) + "...", file=sys.stderr)
 
         # compute all relevant decorrelation sources
@@ -172,14 +173,20 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
 
         print("        Mean phase standard deviation is " + str(np.mean(sigma_phase)) + "...", file=sys.stderr)
 
-        return sigma_phase, corr_tot, Nlooks, NESN
+        return sigma_phase, corr_tot, Nlooks, NESN, sigma0
 
     def thermalCorrelation(self, SNR):
         thermal_corr = (1 / (1 + 1 / SNR))
         return thermal_corr
 
     def volumeCorrelation(self, eps, penDepth, baseline, r0, wl, incAng):
-        corr = 1 / np.sqrt(1 + (2 * np.pi * np.sqrt(eps) * penDepth * baseline / (r0 * wl * np.tan(incAng))) ** 2)
+        refAng = np.arcsin(np.sin(incAng)/np.sqrt(eps))
+        HoA = wl * r0 * np.sin(incAng) / (2*baseline)
+        HoA_vol = HoA/np.sqrt(eps) * np.cos(refAng) / np.cos(incAng)
+        dp2 = penDepth/2 * np.cos(refAng)
+
+        corr = abs(1/(1 + 1j * 2 * np.pi * dp2/HoA_vol))
+        # corr = 1 / np.sqrt(1 + (2 * np.pi * np.sqrt(eps) * penDepth * baseline / (r0 * wl * np.tan(incAng))) ** 2)
         return corr
 
     def criticalBaseline(self, wl, r0, incAng, B, c0):
@@ -239,7 +246,6 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         faOut = self.getOutputDoppler(prf=PRF, Na=Naux)
         Nabw = int(np.round(doppBw / (faOut[1] - faOut[0])))  # number of bins corresponding to Doppler bandwidth
         idxAz = np.round((dopplerCentroid - faOut[0]) / (faOut[1] - faOut[0])).astype(int)  # index of doppler centroid
-
         thOut = np.arcsin(wvlength * faOut / 2 / vSat)
         angAp = abs(thOut[-1] - thOut[
             0])  # angular extent of the PRF

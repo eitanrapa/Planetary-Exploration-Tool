@@ -8,6 +8,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+from scipy.interpolate import griddata
 import pet
 
 
@@ -57,16 +58,18 @@ times = campaign.get_five_tracks()
 orbit_cycle_time = campaign.orbit_cycle
 
 # Get the track
-track = pet.dataAcquisition.track(name="track", start_time=times[0], end_time=times[0] + 60*90, planet=planet,
-                                  campaign=campaign, instrument=instrument, spatial_resolution=700,
-                                  temporal_resolution=20, interpol2FinalRes=1, interferogram_resolution_az=700,
-                                  interferogram_resolution_rg=700)
+start = times[0] + 60*180  + 60*70
+end = start + 60*20
+track = pet.dataAcquisition.track(name="track", start_time=start, end_time=end, planet=planet,
+                                  campaign=campaign, instrument=instrument, spatial_resolution=150,
+                                  temporal_resolution=7, interpol2FinalRes=0, interferogram_resolution_az=400,
+                                  interferogram_resolution_rg=400)
 track.calculate_ground_swath_new()
 
 
 
 # Specify the baseline
-baseline = 200.
+baseline = 70.
 # Specify the basline uncertainty
 baseline_uncertainty = 0.
 # Specify the baseline orientation (roll=0 means horizontal)
@@ -98,74 +101,105 @@ heights = llh[:,2]
 heightError_corr = -1*planet.get_height_above_surface(xyz_meas)
 #---------------------------------------------
 
-#plot height-------------------------------------------------------------------
-projection = pet.projections.biaxialProjections.biaxialCylindrical(name="biaxial cylindrical",
-                                                                        folder_path="/data/largeHome/bene_an/Projects/nightingale/Simulation/Planetary-Exploration-Tool/output/plots/")
-fig1, ax1, globe1 = projection.proj(planet=planet)
-# Make the colormap cyclical
-cm = plt.cm.get_cmap('terrain')
-im = ax1.scatter(longitudes, latitudes, cmap=cm,
-                transform=ccrs.PlateCarree(globe=globe1), c=heightError_corr, s=0.01,marker=',')
-plt.colorbar(im, fraction=0.02, pad=0.1)
-plt.title('height error [m]', pad=12)
-plt.savefig('heightError.png', format='png',dpi=300,bbox_inches="tight")
-
-fig2, ax2, globe2 = projection.proj(planet=planet)
-# Make the colormap cyclical
-cm = plt.cm.get_cmap('terrain')
-im = ax2.scatter(longitudes, latitudes, cmap=cm,
-                transform=ccrs.PlateCarree(globe=globe2), c=heights, s=0.01,marker=',')
-plt.colorbar(im, fraction=0.02, pad=0.1)
-plt.title('measured height [m]', pad=12)
-plt.savefig('height_meas.png', format='png',dpi=300,bbox_inches="tight")
-
-fig3, ax3, globe3 = projection.proj(planet=planet)
-# Make the colormap cyclical
-cm = plt.cm.get_cmap('Spectral')
-im = ax3.scatter(longitudes, latitudes, cmap=cm,
-                transform=ccrs.PlateCarree(globe=globe3), c=10*np.log10(interferogram.NESN), s=0.01,marker=',')
-plt.colorbar(im, fraction=0.02, pad=0.1)
-plt.title('NESN [dB]', pad=12)
-plt.savefig('NESN.png', format='png',dpi=300,bbox_inches="tight")
-
-fig4, ax4, globe4 = projection.proj(planet=planet)
-# Make the colormap cyclical
-cm = plt.cm.get_cmap('Spectral')
-im = ax4.scatter(longitudes, latitudes, cmap=cm,
-                transform=ccrs.PlateCarree(globe=globe4), c=interferogram.corr_tot, s=0.01,marker=',')
-plt.colorbar(im, fraction=0.02, pad=0.1)
-plt.title('total decorrelation []', pad=12)
-plt.savefig('coherence.png', format='png',dpi=300,bbox_inches="tight")
-
-fig5, ax5, globe5 = projection.proj(planet=planet)
-# Make the colormap cyclical
-cm = plt.cm.get_cmap('Spectral')
-im = ax5.scatter(longitudes, latitudes, cmap=cm,
-                transform=ccrs.PlateCarree(globe=globe5), c=interferogram.sigma_phase, s=0.01,marker=',')
-plt.colorbar(im, fraction=0.02, pad=0.1)
-plt.title('phase standard deviation [rad]', pad=12)
-plt.savefig('phase_std.png', format='png',dpi=300,bbox_inches="tight")
-#------------------------------------------------------------------------------
-
-
-#plot some interferometric products--------------------------------------------
 kz = interferogram.data['kz'].kz.values
 HoA = 2 * np.pi / kz
-incAng = interferogram.data['incAng'].incAng.values
+incAng = track.data.values
 phase_absolut = interferogram.data['phase_absolut'].phase_absolut.values
 phase_ref = interferogram.data['phase_ref'].phase_ref.values
 phase_flat = phase_absolut - phase_ref
 phase_flat_wrapped = phase_flat%(2*np.pi)
 height_true = track.data["height"].values
 
-interferogram.visualize_interferogram(phase_flat, projection, "hsv","flattened phase [rad]", "phase_flat.png")
-interferogram.visualize_interferogram(phase_absolut, projection, "hsv", "absolut phase [rad]", "phase_absolut.png")
-interferogram.visualize_interferogram(phase_ref, projection, "hsv","reference phase [rad]", "phase_reference.png")
-interferogram.visualize_interferogram(phase_flat_wrapped, projection, "hsv","wrapped phase [rad]", "phase_wrapped.png")
-interferogram.visualize_interferogram(np.rad2deg(incAng), projection, "Spectral","incident angle knowledge [deg]", "incAng_know.png")
-interferogram.visualize_interferogram(np.rad2deg(track.data.values), projection, "Spectral", "incident angle [deg]", "incAng.png")
-interferogram.visualize_interferogram(HoA, projection, "Spectral","height of ambiguity knowledge [m]", "HoA_know.png")
-interferogram.visualize_interferogram(height_true, projection, "terrain","DEM [m]", "DEM.png")
+
+def plotData(projection, longitudes, latitudes, data, cmap, s, marker, vmin, vmax, extent,filename,title):
+    fig1, ax1, globe1 = projection.proj(planet=planet)
+    # Make the colormap cyclical
+    cm = plt.cm.get_cmap('terrain')
+    im = ax1.scatter(longitudes, latitudes, cmap=cmap,
+                    transform=ccrs.PlateCarree(globe=globe1), c=data, s=s,
+                    marker=marker, vmin=vmin, vmax=vmax)
+    ax1.set_extent(extent)
+    plt.colorbar(im, fraction=0.022, pad=0.1)
+    plt.title(title, pad=12)
+    plt.savefig(filename, format='png',dpi=300,bbox_inches="tight")
+    fig1.clf()
+
+
+
+
+
+#plot height-------------------------------------------------------------------
+extent = [np.min(longitudes), np.max(longitudes), np.min(latitudes), np.max(latitudes)]
+s=0.4
+marker='.'
+projection = pet.projections.biaxialProjections.biaxialCylindrical(name="biaxial cylindrical",
+                                                                        folder_path="/data/largeHome/bene_an/Projects/nightingale/Simulation/Planetary-Exploration-Tool/output/plots/")
+
+plotData(projection, longitudes, latitudes, heightError_corr, cmap='terrain', s=s,
+marker=marker, vmin=np.min(heightError_corr), vmax=np.max(heightError_corr),
+extent=extent,filename='output/plots/heightError.png',
+title='height error [m]')
+
+plotData(projection, longitudes, latitudes, heights, cmap='terrain', s=s,
+marker=marker, vmin=np.min(heights), vmax=np.max(heights),
+extent=extent,filename='output/plots/height_meas.png',
+title='measured height [m]')
+
+plotData(projection, longitudes, latitudes, 10*np.log10(interferogram.NESN), cmap='Spectral', s=s,
+marker=marker, vmin=np.min(10*np.log10(interferogram.NESN)), vmax=np.max(10*np.log10(interferogram.NESN)),
+extent=extent,filename='output/plots/NESN.png',
+title='NESN [dB]')
+
+plotData(projection, longitudes, latitudes, interferogram.corr_tot, cmap='gray', s=s,
+marker=marker, vmin=0, vmax=1,
+extent=extent,filename='output/plots/coherence.png',
+title='coherence []')
+
+plotData(projection, longitudes, latitudes, 10*np.log10(interferogram.sigma0), cmap='gray', s=s,
+marker=marker, vmin=-1, vmax=5,
+extent=extent,filename='output/plots/sigma0.png',
+title='backscatter [dB]')
+
+plotData(projection, longitudes, latitudes, np.rad2deg(incAng), cmap='Spectral', s=s,
+marker=marker, vmin=np.min(np.rad2deg(incAng)), vmax=np.max(np.rad2deg(incAng)),
+extent=extent,filename='output/plots/incAng.png',
+title='incidence angle [deg]')
+
+plotData(projection, longitudes, latitudes, phase_flat_wrapped, cmap='hsv', s=s,
+marker=marker, vmin=0, vmax=2*np.pi,
+extent=extent,filename='output/plots/phase_wrapped.png',
+title='wrapped phase [rad]')
+# #------------------------------------------------------------------------------
+
+
+a, b, c = planet.get_axes()
+custom_globe = ccrs.Globe(semimajor_axis=a,
+                     semiminor_axis=b,
+                     ellipse=None)
+projection = ccrs.SouthPolarStereo(globe=custom_globe)
+
+fig, ax = plt.subplots(subplot_kw={'projection': projection})
+# Make the colormap cyclical
+cm = plt.cm.get_cmap('hsv')
+im = ax.scatter(longitudes, latitudes, cmap='hsv',
+                transform=ccrs.PlateCarree(globe=custom_globe), c=phase_flat_wrapped, s=s,
+                marker=marker)
+ax.set_extent([-180,180,-90,-60])
+plt.colorbar(im, fraction=0.022, pad=0.1)
+plt.title('south polar', pad=12)
+plt.savefig('output/plots/phase_wrapped_south.png', format='png',dpi=300,bbox_inches="tight")
+fig.clf()
+
+
+#plot some interferometric products--------------------------------------------
+# interferogram.visualize_interferogram(phase_flat, projection, "hsv","flattened phase [rad]", "output/plots/phase_flat.png")
+# interferogram.visualize_interferogram(phase_absolut, projection, "hsv", "absolut phase [rad]", "output/plots/phase_absolut.png")
+# interferogram.visualize_interferogram(phase_ref, projection, "hsv","reference phase [rad]", "output/plots/phase_reference.png")
+# interferogram.visualize_interferogram(phase_flat_wrapped, projection, "hsv","wrapped phase [rad]", "output/plots/phase_wrapped.png")
+# interferogram.visualize_interferogram(np.rad2deg(incAng), projection, "Spectral","incident angle knowledge [deg]", "output/plots/incAng_know.png")
+# interferogram.visualize_interferogram(np.rad2deg(track.data.values), projection, "Spectral", "incident angle [deg]", "output/plots/incAng.png")
+# interferogram.visualize_interferogram(HoA, projection, "Spectral","height of ambiguity knowledge [m]", "output/plots/HoA_know.png")
+# interferogram.visualize_interferogram(height_true, projection, "terrain","DEM [m]", "output/plots/DEM.png")
 #------------------------------------------------------------------------------
 
 fm.clear()

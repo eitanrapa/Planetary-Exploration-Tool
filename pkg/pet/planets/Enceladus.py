@@ -120,14 +120,14 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
 
         #project normal vector on incidence plane
         LoS_norm = LoSs / np.linalg.norm(LoSs, axis=-1)[:,np.newaxis]
-        plane_normalVec = np.cross(-pSat, LoS_norm)
-        plane_normalVec = plane_normalVec/np.linalg.norm(plane_normalVec, axis=-1)[:,np.newaxis]
-        normal_perp = np.sum(normal*plane_normalVec, axis=-1)[:,np.newaxis] * plane_normalVec
-        normal_proj = normal - normal_perp
-        normal_proj = normal_proj/np.linalg.norm(plane_normalVec, axis=-1)[:,np.newaxis]
+        # plane_normalVec = np.cross(-pSat, LoS_norm)
+        # plane_normalVec = plane_normalVec/np.linalg.norm(plane_normalVec, axis=-1)[:,np.newaxis]
+        # normal_perp = np.sum(normal*plane_normalVec, axis=-1)[:,np.newaxis] * plane_normalVec
+        # normal_proj = normal - normal_perp
+        # normal_proj = normal_proj/np.linalg.norm(plane_normalVec, axis=-1)[:,np.newaxis]
 
         # get local incident angle
-        incAngles = np.arccos(np.sum(-LoS_norm * normal_proj, axis=1))
+        incAngles = np.arccos(np.sum(-LoS_norm * normal, axis=1))
 
         # Return the intersects and incident angles
         return intersects, incAngles
