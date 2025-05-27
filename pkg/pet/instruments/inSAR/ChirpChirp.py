@@ -28,7 +28,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     look_angle.doc = "look angle of the radar instrument"
 
     antenna_length = pet.properties.float()
-    antenna_length.default = 2.
+    antenna_length.default = 1.5
     antenna_length.doc = "antenna length (azimuth) [m]"
 
     antenna_height = pet.properties.float()
@@ -40,7 +40,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     range_bandwidth.doc = "range bandwidth of the radar instrument [Hz]"
 
     antenna_efficiency = pet.properties.float()
-    antenna_efficiency.default = -3
+    antenna_efficiency.default = -1.55
     antenna_efficiency.doc = "antenna efficiency [dB]"
 
     peak_power = pet.properties.float()
@@ -48,11 +48,11 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     peak_power.doc = "peak power of the radar instrument [W]"
 
     pulse_duration = pet.properties.float()
-    pulse_duration.default = 111 * 1e-6  # 60 microseconds
+    pulse_duration.default = 60 * 1e-6  # 60 microseconds
     pulse_duration.doc = "pulse duration of the radar instrument [s]"
 
     pulse_repetition_frequency = pet.properties.float()
-    pulse_repetition_frequency.default = 450
+    pulse_repetition_frequency.default = 500
     pulse_repetition_frequency.doc = "pulse repetition frequency of the radar instrument [Hz]"
 
     az_bandwidth_proc = pet.properties.float()
@@ -64,7 +64,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     az_resolution_proc.doc = "processed azimuth resolution [m]"
 
     noise_figure = pet.properties.float()
-    noise_figure.default = 3
+    noise_figure.default = 4
     noise_figure.doc = "noise figure of the radar instrument [dB]"
 
     power_margin = pet.properties.float()
@@ -72,7 +72,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     power_margin.doc = "power margin of the radar instrument [dB]"
 
     receiver_noise_temperature = pet.properties.float()
-    receiver_noise_temperature.default = 240
+    receiver_noise_temperature.default = 290
     receiver_noise_temperature.doc = "receiver noise temperature of the radar instrument [K]"
 
     processing_azimuth_resolution = pet.properties.float()
@@ -142,7 +142,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         print("        Mean NESN is " + str(10*np.log10(np.mean(NESN))) + "...", file=sys.stderr)
 
         # compute the SNR
-        sigma0 = 3.51*np.cos(incidence_angles)**1.23#10**(planet.surface_backscatter/10)
+        sigma0 = (3.51*np.cos(incidence_angles)**1.23) / (10**0.4)
         SNR = self.nesn2snr(nesn=NESN, sigma0=sigma0)
         print("        Mean SNR is " + str(10*np.log10(np.mean(SNR))) + "...", file=sys.stderr)
 
@@ -150,7 +150,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         corr_thermal = self.thermalCorrelation(SNR=SNR)
         corr_basline = self.baselineCorrelation(B=self.range_bandwidth, incAng=incidence_angles, baseline=baseline,
                                                 wl=self.wavelength, r0=distances, c0=c0)
-        corr_volume = self.volumeCorrelation(eps=planet.surface_permittivity, penDepth=planet.radar_penetration_depth,
+        corr_volume, HoA, HoA_vol = self.volumeCorrelation(eps=planet.surface_permittivity, penDepth=planet.radar_penetration_depth,
                                              baseline=baseline, r0=distances, wl=self.wavelength,
                                              incAng=incidence_angles)
 
@@ -170,10 +170,11 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
 
         # compute the standard deviation of the phase of the interferogram
         sigma_phase = self.coherence2phasenoise(coherence=corr_tot, effectiveLooks=Nlooks)
-
+        sigma_height = sigma_phase * HoA / 2 / np.pi
+        sigma_disp = sigma_phase * self.wavelength / 4 / np.pi
         print("        Mean phase standard deviation is " + str(np.mean(sigma_phase)) + "...", file=sys.stderr)
 
-        return sigma_phase, corr_tot, Nlooks, NESN, sigma0
+        return sigma_phase, sigma_height, sigma_disp, corr_tot, Nlooks, NESN, sigma0
 
     def thermalCorrelation(self, SNR):
         thermal_corr = (1 / (1 + 1 / SNR))
@@ -183,11 +184,11 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         refAng = np.arcsin(np.sin(incAng)/np.sqrt(eps))
         HoA = wl * r0 * np.sin(incAng) / (2*baseline)
         HoA_vol = HoA/np.sqrt(eps) * np.cos(refAng) / np.cos(incAng)
-        dp2 = penDepth/2 * np.cos(refAng)
+        dp2 = penDepth * np.cos(refAng)
 
         corr = abs(1/(1 + 1j * 2 * np.pi * dp2/HoA_vol))
         # corr = 1 / np.sqrt(1 + (2 * np.pi * np.sqrt(eps) * penDepth * baseline / (r0 * wl * np.tan(incAng))) ** 2)
-        return corr
+        return corr, HoA, HoA_vol
 
     def criticalBaseline(self, wl, r0, incAng, B, c0):
         critical_baseline = B * wl * r0 * np.tan(incAng) / c0
