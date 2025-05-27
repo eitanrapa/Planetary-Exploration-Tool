@@ -12,7 +12,7 @@ import numpy as np
 import cartopy.crs as ccrs
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from scipy.optimize import root
+from scipy.optimize import root, fsolve
 import sys
 import pdb
 
@@ -48,6 +48,12 @@ def solveInSAR(vars, phi, wl, p_m, p_s, v_m, rho, doppler):
 def solveGeocodeEllipsoid(vars, wl, p_m, v_m, rho, doppler, a, b, c):
     p = np.array(vars)
     return[(p[0]**2 / a**2 + p[1]**2 / b**2 + p[2]**2 / c**2)*2e3 - 2e3,
+           np.linalg.norm(p-p_m) - rho,
+           (-2/wl * np.dot(v_m,(p-p_m)) / np.linalg.norm((p-p_m)))*2e3 - doppler*2e3]
+
+def solveGeocodeDEM(vars, wl, p_m, v_m, rho, doppler,planet):
+    p = np.array(vars)
+    return[planet.get_distance_from_surface(p),
            np.linalg.norm(p-p_m) - rho,
            (-2/wl * np.dot(v_m,(p-p_m)) / np.linalg.norm((p-p_m)))*2e3 - doppler*2e3]
 
@@ -229,6 +235,7 @@ class SimpleInterferogramTopo(pet.component, family="pet.dataAnalysis.surfaceDef
         print("     Getting satellite positions of orbit 1...", file=sys.stderr)
         # Get satellite positions and velocities of first orbit
         satellite_positions1, satellite_velocity1 = self.campaign.get_states(times=self.track.data["sat_pos_time"].values)
+
         # Get lines of sight and Doppler frequency
         LoS = positions - satellite_positions1
         fDoppler = -2 * np.array([np.dot(v1, v2)for v1, v2 in zip(satellite_velocity1, LoS)])\
@@ -271,7 +278,7 @@ class SimpleInterferogramTopo(pet.component, family="pet.dataAnalysis.surfaceDef
         nadir_norm = -satellite_positions1/np.linalg.norm(satellite_positions1,axis=-1)[:,np.newaxis]
         look_ang = np.arccos(np.sum(LoS * nadir_norm, axis=-1))
         #get performance
-        self.sigma_phase, self.corr_tot, self.Nlooks, self.NESN, self.sigma0 = self.instrument.get_instrument_noise(planet=self.planet,
+        self.sigma_phase, self.sigma_height, self.sigma_disp, self.corr_tot, self.Nlooks, self.NESN, self.sigma0 = self.instrument.get_instrument_noise(planet=self.planet,
                                              baseline=b_perp,
                                              satellite_velocity=satellite_velocity1,
                                              look_angles=look_ang,
@@ -281,7 +288,7 @@ class SimpleInterferogramTopo(pet.component, family="pet.dataAnalysis.surfaceDef
         noise = np.random.normal(np.zeros(len(self.sigma_phase)), self.sigma_phase)
         print("        Noise mean meas:"+str(np.mean(noise))+"...", file=sys.stderr)
         print("        Noise std meas:"+str(np.std(noise))+"...", file=sys.stderr)
-        phase_topo_forward += noise
+        # phase_topo_forward += noise
         #----------------------------------------------------------------------
 
 
@@ -290,11 +297,23 @@ class SimpleInterferogramTopo(pet.component, family="pet.dataAnalysis.surfaceDef
 
         print("        Getting reference phase...", file=sys.stderr)
         # Get distances and phase for inversion (i.e., reference phase)
-        useDEM = False
-        if useDEM:
+        useDEM = 'ellipsoid'
+        if useDEM=='exact':
             print("          Using exact DEM...", file=sys.stderr)
             distances1_ref = np.linalg.norm(positions - satellite_positionsK1, axis=-1)
             distances2_ref = np.linalg.norm(positions - satellite_positionsK2, axis=-1)
+        elif useDEM=='reference':
+            print("          Using reference DEM...", file=sys.stderr)
+            print("            Getting points on reference DEM (aka backgeo)...", file=sys.stderr)
+            positionsReference = np.zeros(positions.shape)
+            for ii in tqdm(range(len(distances1))):
+                res = root(solveGeocodeDEM, positions[ii,:]+np.random.normal(0,1e3,3),
+                            args=(self.instrument.wavelength, satellite_positions1[ii,:],
+                            satellite_velocityK1[ii,:], distances1[ii], fDoppler[ii], self.planet))
+                positionsReference[ii,:] = res.x
+            distances1_ref = np.linalg.norm(positionsReference - satellite_positionsK1, axis=-1)
+            distances2_ref = np.linalg.norm(positionsReference - satellite_positionsK2, axis=-1)
+            phase_ref = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2_ref - distances1_ref)
         else:
             print("          Using ellipsoid...", file=sys.stderr)
             print("            Getting points on ellipsoid (aka backgeo)...", file=sys.stderr)
@@ -343,7 +362,7 @@ class SimpleInterferogramTopo(pet.component, family="pet.dataAnalysis.surfaceDef
             b_perp_vec = b_vec - np.sum(b_vec*LoS_k, axis=-1)[:,np.newaxis] * LoS_k
             b_perp_k = np.linalg.norm(b_perp_vec, axis=-1)
             # get incident angle (just read from track here)
-            incAng_k = self.track.data["incAng"].values
+            incAng_k = self.track.data.values
         else:
             print("        Assuming ellipsoid...", file=sys.stderr)
             # get perpendicular baseline
