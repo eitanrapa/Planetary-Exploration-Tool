@@ -272,7 +272,7 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         thetas = np.deg2rad(thetas)
 
         print("     Getting lines of sight...", file=sys.stderr)
-        LoS = create_LoS(satellite_positions, satellite_velocities,thetas)
+        LoS = create_LoS(satellite_positions, satellite_velocities,thetas, right_looking=True)
 
         print("     Getting intercept points and local incident angles...", file=sys.stderr)
         icp = np.zeros(LoS.shape)
