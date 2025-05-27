@@ -41,7 +41,7 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     surface_backscatter.doc = "The surface backscatter of Enceladus [dB]"
 
     radar_penetration_depth = pet.properties.float()
-    radar_penetration_depth.default = 30
+    radar_penetration_depth.default = 100
     radar_penetration_depth.doc = "The radar penetration depth of Enceladus [m]"
 
     surface_permittivity = pet.properties.float()
@@ -146,16 +146,44 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         # Retrieve the DSK DLA
         dla = spice.dlabfs(handle=handle)
 
-        # Use the SPICE toolkit to calculate the intersects
-        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=point, raydir= -1*point)[1] for
+        # # Use the SPICE toolkit to calculate the intersects
+        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=point*1e-3*1.1, raydir= -1*point)[1] for
                       point in points]
 
         # Convert to meters
         intersects = np.asanyarray(intersects) * 1e3
 
-        # Return the intersects
-        return np.linalg.norm(intersects-points,axis=1)
-    
+        #get distance
+        height_error = np.linalg.norm(intersects-points,axis=-1)
+
+        #get sign
+        dotProd = np.sum((intersects - points) * (-points), axis=-1)
+        height_error[dotProd>0] *= (-1)
+
+        return height_error
+
+    @pet.export
+    def get_distance_from_surface(self, point):
+        """
+        Find the intersects of a set of vectors with the planet DSK
+        :param vectors: Vectors for which to find intersects
+        :return: The x, y, z intersects of the vectors with the DSK [m]
+        """
+
+        # Retrieve the DSK handle
+        handle = spice.kdata(which=0, kind="dsk")[3]
+
+        # Retrieve the DSK DLA
+        dla = spice.dlabfs(handle=handle)
+
+        # # Use the SPICE toolkit to calculate the intersects
+        intersect = spice.dskx02(handle=handle, dladsc=dla, vertex=point*1e-3*1.1, raydir= -1*point)[1]
+
+        # Convert to meters
+        intersect = np.asanyarray(intersect) * 1e3
+
+        return np.linalg.norm(intersect - point)
+
     @pet.export
     def get_closest_point(self, points):
         """
