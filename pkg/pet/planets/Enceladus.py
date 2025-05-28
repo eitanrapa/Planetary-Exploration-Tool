@@ -38,9 +38,9 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     surface_backscatter.default = 0
     surface_backscatter.doc = "The surface backscatter of Enceladus [dB]"
 
-    radar_penetration_depth = pet.properties.float()
-    radar_penetration_depth.default = 15
-    radar_penetration_depth.doc = "The radar penetration depth of Enceladus [m]"
+    radar_penetration_length = pet.properties.float()
+    radar_penetration_length.default = 100
+    radar_penetration_length.doc = "The radar penetration depth of Enceladus [m]"
 
     surface_permittivity = pet.properties.float()
     surface_permittivity.default = 2.2
@@ -103,12 +103,14 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
 
         # Project normal vector on incidence plane
         line_of_sight_norms = raydirs / np.linalg.norm(raydirs, axis=-1)[:, np.newaxis]
+
+        # get local incident angle
+        non_projected_incidence_angles = np.arccos(np.sum(-line_of_sight_norms * normals, axis=1))
+        non_projected_incidence_angles = np.degrees(non_projected_incidence_angles)
+
+        # project normal vector on incidence plane
         plane_normal_vectors = np.cross(-satellite_position, line_of_sight_norms)
-
-        # Normalize
         plane_normal_vectors = plane_normal_vectors / np.linalg.norm(plane_normal_vectors, axis=-1)[:, np.newaxis]
-
-        # Normal projections
         normal_perps = np.sum(normals * plane_normal_vectors, axis=-1)[:, np.newaxis] * plane_normal_vectors
         normal_projs = normals - normal_perps
         normal_projs = normal_projs / np.linalg.norm(plane_normal_vectors, axis=-1)[:, np.newaxis]
@@ -117,21 +119,19 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         incidence_angles = np.arccos(np.sum(-line_of_sight_norms * normal_projs, axis=1))
         incidence_angles = np.degrees(incidence_angles)
 
-        # Get the look angles by calculating the angle between the satellite position vector and the
-        # satellite position to intersect vector
-        vector_to_intersects = intersects - satellite_position
-        vector_to_intersects = vector_to_intersects / np.linalg.norm(vector_to_intersects, axis=-1)[:, np.newaxis]
-        look_angles = np.arccos(np.sum(-satellite_position * vector_to_intersects, axis=1))
+        nadir_norm = -satellite_position / np.linalg.norm(satellite_position)
+        look_angles = np.arccos(np.sum(line_of_sight_norms * nadir_norm, axis=-1))
+        look_angles = np.degrees(look_angles)
 
         # Return the intersects, incidence angles, and look angles
-        return intersects, incidence_angles, look_angles
+        return intersects, incidence_angles, non_projected_incidence_angles, look_angles
 
     @pet.export
-    def get_closest_point_to_surface(self, points):
+    def get_height_above_surface(self, points):
         """
-        Get the closest intersect of a point with the planet and the distance to the surface
-        :param points: Points to calculate the closest intersect with the DSK [m]
-        :return: The x, y, z intersects of the vectors with the DSK [m] and the distance to the surface [m]
+        Get heigh above or below the surface of a set of points
+        :param points: The points to calculate the height above surface for [m]
+        :return: The x, y, z intersects of the vectors with the DSK [m]
         """
 
         # Retrieve the DSK handle
@@ -140,18 +140,43 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
         # Retrieve the DSK DLA
         dla = spice.dlabfs(handle=handle)
 
-        # Use the SPICE toolkit to calculate the intersects
-        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=point, raydir=-1 * point)[1] for
+        # # Use the SPICE toolkit to calculate the intersects
+        intersects = [spice.dskx02(handle=handle, dladsc=dla, vertex=point*1e-3*1.1, raydir= -1*point)[1] for
                       point in points]
 
         # Convert to meters
         intersects = np.asanyarray(intersects) * 1e3
 
-        # Get the distance
-        distances = np.linalg.norm(intersects - points, axis=1)
+        #get distance
+        height_error = np.linalg.norm(intersects-points,axis=-1)
 
-        # Return the intersects and distances
-        return intersects, distances
+        #get sign
+        dot_prod = np.sum((intersects - points) * (-points), axis=-1)
+        height_error[dot_prod>0] *= (-1)
+
+        return height_error
+
+    @pet.export
+    def get_distance_from_surface(self, point):
+        """
+        Get the distance from a point to the surface of Enceladus
+        :param point: Point for which to find the distance to the surface
+        :return: The x, y, z intersects of the vectors with the DSK [m]
+        """
+
+        # Retrieve the DSK handle
+        handle = spice.kdata(which=0, kind="dsk")[3]
+
+        # Retrieve the DSK DLA
+        dla = spice.dlabfs(handle=handle)
+
+        # # Use the SPICE toolkit to calculate the intersects
+        intersect = spice.dskx02(handle=handle, dladsc=dla, vertex=point*1e-3*1.1, raydir= -1*point)[1]
+
+        # Convert to meters
+        intersect = np.asanyarray(intersect) * 1e3
+
+        return np.linalg.norm(intersect - point)
 
     @pet.export
     def get_sub_obs_points(self, times, campaign):

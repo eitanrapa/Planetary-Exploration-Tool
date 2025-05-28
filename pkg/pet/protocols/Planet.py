@@ -26,9 +26,15 @@ class Planet(pet.protocol, family="pet.planets"):
         """
 
     @pet.provides
-    def get_closest_point_to_surface(self, points):
+    def get_height_above_surface(self, points):
         """
-        Get the closest intersect of a point with the planet and the distance to the surface
+        Get heigh above or below the surface of a set of points
+        """
+
+    @pet.export
+    def get_distance_from_surface(self, point):
+        """
+        Get the distance from a point to the surface of Enceladus
         """
 
     @pet.provides

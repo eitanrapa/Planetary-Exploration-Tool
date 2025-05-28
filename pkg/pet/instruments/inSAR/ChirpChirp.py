@@ -30,7 +30,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     look_angle.doc = "look angle of the radar instrument"
 
     antenna_length = pet.properties.float()
-    antenna_length.default = 2.0
+    antenna_length.default = 1.5
     antenna_length.doc = "antenna length (azimuth) [m]"
 
     antenna_height = pet.properties.float()
@@ -42,7 +42,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     range_bandwidth.doc = "range bandwidth of the radar instrument [Hz]"
 
     antenna_efficiency = pet.properties.float()
-    antenna_efficiency.default = -3
+    antenna_efficiency.default = -1.55
     antenna_efficiency.doc = "antenna efficiency [dB]"
 
     peak_power = pet.properties.float()
@@ -50,11 +50,11 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     peak_power.doc = "peak power of the radar instrument [W]"
 
     pulse_duration = pet.properties.float()
-    pulse_duration.default = 111 * 1e-6  # 60 microseconds
+    pulse_duration.default = 60 * 1e-6  # 60 microseconds
     pulse_duration.doc = "pulse duration of the radar instrument [s]"
 
     pulse_repetition_frequency = pet.properties.float()
-    pulse_repetition_frequency.default = 450
+    pulse_repetition_frequency.default = 500
     pulse_repetition_frequency.doc = "pulse repetition frequency of the radar instrument [Hz]"
 
     az_bandwidth_proc = pet.properties.float()
@@ -66,7 +66,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     az_resolution_proc.doc = "processed azimuth resolution [m]"
 
     noise_figure = pet.properties.float()
-    noise_figure.default = 3
+    noise_figure.default = 4
     noise_figure.doc = "noise figure of the radar instrument [dB]"
 
     power_margin = pet.properties.float()
@@ -74,7 +74,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
     power_margin.doc = "power margin of the radar instrument [dB]"
 
     receiver_noise_temperature = pet.properties.float()
-    receiver_noise_temperature.default = 240
+    receiver_noise_temperature.default = 290
     receiver_noise_temperature.doc = "receiver noise temperature of the radar instrument [K]"
 
     processing_azimuth_resolution = pet.properties.float()
@@ -103,8 +103,8 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         return
 
     @pet.export
-    def get_instrument_noise(self, planet, baseline, satellite_velocities, look_angles, incidence_angles, distances,
-                             variable_backscatter=False):
+    def get_instrument_noise(self, planet, perpendicular_baseline, satellite_velocities, look_angles, incidence_angles,
+                             non_projected_incidence_angles, distances, variable_backscatter=False):
         """
         Helper function to get the instrument noise
         """
@@ -113,24 +113,30 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         satellite_velocities = np.asarray(satellite_velocities)
         look_angles = np.asarray(look_angles)
         incidence_angles = np.asarray(incidence_angles)
+        non_projected_incidence_angles = np.asarray(non_projected_incidence_angles)
         distances = np.asarray(distances)
 
         # Make look angles and incidence angles radians
         look_angles = np.deg2rad(look_angles)
         incidence_angles = np.deg2rad(incidence_angles)
+        non_projected_incidence_angles = np.deg2rad(non_projected_incidence_angles)
 
-        return self._get_instrument_noise(planet, baseline, satellite_velocities, look_angles,
-                                          incidence_angles, distances, variable_backscatter)
+        return self._get_instrument_noise(planet=planet, perpendicular_baseline=perpendicular_baseline,
+                                          satellite_velocities=satellite_velocities, look_angles=look_angles,
+                                          incidence_angles=incidence_angles,
+                                          non_projected_incidence_angles=non_projected_incidence_angles,
+                                          distances=distances, variable_backscatter=variable_backscatter)
 
-    def _get_instrument_noise(self, planet, baseline, satellite_velocities, look_angles, incidence_angles, distances,
-                             variable_backscatter=False):
+    def _get_instrument_noise(self, planet, perpendicular_baseline, satellite_velocities, look_angles, incidence_angles,
+                              non_projected_incidence_angles, distances, variable_backscatter=False):
         """
         Get instrument noise for the radar instrument
         :param planet: Planet object
-        :param baseline: Perpendicular baseline of the radar instrument [m]
+        :param perpendicular_baseline: Perpendicular baseline of the radar instrument [m]
         :param satellite_velocities: Satellite velocities [m/s]
-        :param look_angles: Look angles of the radar instrument [rad]
-        :param incidence_angles: Incidence angles of the radar instrument [rad]
+        :param look_angles: Look angles of the radar instrument [deg]
+        :param incidence_angles: Incidence angles of the radar instrument [deg]
+        :param non_projected_incidence_angles: Non-projected incidence angles of the radar instrument [deg]
         :param distances: Distances of the radar instrument [m]
         :param variable_backscatter: Flag for variable backscatter
         :return: Standard deviation of the phase of the interferogram [rad]
@@ -171,7 +177,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
 
         # compute the SNR
         if variable_backscatter:
-            sigma0 = 3.51 * np.cos(incidence_angles) ** 1.23
+            sigma0 = (3.51 * np.cos(non_projected_incidence_angles) ** 1.23) / (10 ** 0.4)
         else:
             sigma0 = 10**(planet.surface_backscatter/10)
 
@@ -182,11 +188,11 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         # compute all relevant decorrelation sources
         corr_thermal = self.thermal_correlation(snr=snr)
         corr_baseline = self.baseline_correlation(bandwidth=self.range_bandwidth,
-                                                  incidence_angle=incidence_angles, baseline=baseline,
+                                                  incidence_angle=incidence_angles, baseline=perpendicular_baseline,
                                                   wavelength=self.wavelength, slant_range=distances)
-        corr_volume = self.volume_correlation(eps=planet.surface_permittivity,
+        corr_volume, ho_a, ho_a_vol = self.volume_correlation(eps=planet.surface_permittivity,
                                               penetration_depth=planet.radar_penetration_depth,
-                                              baseline=baseline, slant_range=distances, wavelength=self.wavelength,
+                                              baseline=perpendicular_baseline, slant_range=distances, wavelength=self.wavelength,
                                               incidence_angle=incidence_angles)
 
         # compute the total correlation
@@ -204,11 +210,13 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
 
         # compute the standard deviation of the phase of the interferogram
         sigma_phase = self.coherence2phasenoise(coherence=corr_tot, effective_looks=n_looks)
+        sigma_height = sigma_phase * ho_a / 2 / np.pi
+        sigma_disp = sigma_phase * self.wavelength / 4 / np.pi
 
         print("        Mean phase standard deviation is " + str(np.mean(sigma_phase)) + "...", file=sys.stderr)
 
         # Return sigma phase, correlation, number of looks and NESN
-        return sigma_phase, corr_tot, n_looks, nesn, sigma0
+        return sigma_phase, sigma_height, sigma_disp, corr_tot, n_looks, nesn, sigma0
 
     def get_2d_pattern(self, az_ang, elevation_angle, wavelength, len_az, len_el, efficiency):
         """
@@ -360,9 +368,14 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
         :return: Volume decorrelation
         """
 
-        corr = 1 / np.sqrt(1 + (2 * np.pi * np.sqrt(eps) * penetration_depth * baseline /
-                                (slant_range * wavelength * np.tan(incidence_angle))) ** 2)
-        return corr
+        ref_ang = np.arcsin(np.sin(incidence_angle) / np.sqrt(eps))
+        ho_a = wavelength * slant_range * np.sin(incidence_angle) / (2 * baseline)
+        ho_a_vol = ho_a / np.sqrt(eps) * np.cos(ref_ang) / np.cos(incidence_angle)
+        dp2 = penetration_depth * np.cos(ref_ang)
+
+        corr = abs(1 / (1 + 1j * 2 * np.pi * dp2 / ho_a_vol))
+
+        return corr, ho_a, ho_a_vol
 
     @staticmethod
     def critical_baseline(wavelength, slant_range, incidence_angle, bandwidth):

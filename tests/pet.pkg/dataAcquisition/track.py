@@ -29,14 +29,14 @@ times = campaign.get_five_tracks()
 
 # First track
 track1 = pet.dataAcquisition.track(name="track1", start_time=times[0], end_time=times[1], planet=planet,
-                                  campaign=campaign, instrument=instrument, spatial_resolution=2000,
-                                  temporal_resolution=60)
+                                   campaign=campaign, instrument=instrument, spatial_resolution=2000,
+                                   temporal_resolution=60)
 
 # Calculate the positions
 track1.calculate_ground_swath()
 
-# # Save the track
-# track.save(file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/track1")
+# Save the track
+track1.save(file_name="/home/user/Documents/GitHub/Planetary-Exploration-Tool/files/track1")
 
 # # Second track
 # track = pet.dataAcquisition.track(name="track2", start_time=times[1], end_time=times[2], planet=planet,

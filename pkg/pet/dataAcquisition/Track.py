@@ -19,8 +19,8 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
     """
     An object containing the swath of a satellite pass. Contains the start, end, and temporal_resolution of the
     satellite pass
-    as well as given ground resolution to calculate vectors with. Also contains the satellite time vector and a
-    2-D array of the azimuthal beams by row and GroundTargets populating the rows.
+    as well as given ground resolution to calculate vectors with. Also contains the satellite time vector and an
+    xarray dataset of ground intersects and times
     """
 
     start_time = pet.properties.float()
@@ -126,12 +126,15 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         # Open HDF5 file
         self.data.to_netcdf(file_name, engine="netcdf4")
 
-    def create_data_array(self, cartesian_coordinates, geodetic_coordinates, look_angles, times):
+    def create_data_array(self, cartesian_coordinates, geodetic_coordinates, look_angles, incidence_angles,
+                          non_projected_incidence_angles, times):
         """
         Create a xarray with the input data
         :param cartesian_coordinates: x, y, z coordinates to be saved
         :param geodetic_coordinates: lat, long, height coordinates to be saved
         :param look_angles: Calculated look angles from satellite
+        :param incidence_angles: Calculated incidence angles from satellite
+        :param non_projected_incidence_angles: Calculated non-projected incidence angles from satellite
         :param times: Times of observation for points
         :return: Nothing returned
         """
@@ -141,14 +144,15 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
             data=look_angles,
             dims=["points"],
             coords={
-                "sat_pos_time": ("points", times),
                 "time": ("points", times),
                 "x": ("points", np.asarray([point[0] for point in cartesian_coordinates])),
                 "y": ("points", np.asarray([point[1] for point in cartesian_coordinates])),
                 "z": ("points", np.asarray([point[2] for point in cartesian_coordinates])),
                 "latitude": ("points", np.asarray([point[0] for point in geodetic_coordinates])),
                 "longitude": ("points", np.asarray([point[1] for point in geodetic_coordinates])),
-                "height": ("points", np.asarray([point[2] for point in geodetic_coordinates]))},
+                "height": ("points", np.asarray([point[2] for point in geodetic_coordinates])),
+                "incidence_angle": ("points", np.asarray(incidence_angles)),
+                "non_projected_incidence_angle": ("points", np.asarray(non_projected_incidence_angles))},
             name="look_angles",
             attrs=dict(
                 body_id=self.campaign.body_id,
@@ -161,19 +165,6 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
 
         # Save xarray to object
         self.data = da
-
-    def modify_time(self, time):
-        """
-        Modify the time of the track
-        :param time: Time to add to the track
-        :return: Nothing returned
-        """
-
-        self.start_time = self.start_time + time
-        self.end_time = self.end_time + time
-        self.data["time"].values = self.data["time"].values + time
-        self.data.attrs["start_time"] = self.data.attrs["start_time"] + time
-        self.data.attrs["end_time"] = self.data.attrs["end_time"] + time
 
     def convert_positions(self, cartesian_positions):
         """
@@ -194,11 +185,56 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
 
         return flattened_swath_coordinates
 
-    def calculate_ground_swath(self):
+    @staticmethod
+    def create_line_of_sight(position, velocity, thetas, look_direction, force_zero_doppler):
+        """ Find the LoS vector corresponding to a certain position and velocity
+            vector, taking into consideration the look angle and squint
+
+            :param position: antenna origins (satellite's position) [m].
+            :param velocity: velocity of the antenna [m/s].
+            :param thetas: vector angles [radians]
+            :param look_direction: look direction (left or right)
+            :param force_zero_doppler: if True, the LoS is forced to be perpendicular
+             to the velocity vector (zero Doppler).
+            returns: float 3-D array
+            """
+
+        n_la = thetas.size
+
+        if velocity.ndim == 1:
+            ax = 0
+            n_v = 1
+
+        else:
+            ax = 1
+            n_v = velocity.shape[0]
+
+        # Calculate velocity and positions versor
+        v_ver = velocity / np.linalg.norm(velocity, axis=ax).reshape((n_v, 1))
+        r_ver = position / np.linalg.norm(position, axis=ax).reshape((n_v, 1))
+        n_ver = np.cross(v_ver, r_ver)  # cross product of versors
+
+        if force_zero_doppler:
+            r_ver2 = np.cross(n_ver, v_ver)
+
+        else:
+            r_ver2 = r_ver
+
+        if look_direction == "left":
+            thetas = -thetas
+
+        line_of_sight = (-np.cos(thetas.reshape(1, n_la, 1)) * r_ver2.reshape(n_v, 1, 3) +
+                         np.sin(thetas.reshape(1, n_la, 1)) * n_ver.reshape(n_v, 1, 3))
+
+        return line_of_sight
+
+    def calculate_ground_swath(self, force_zero_doppler=True):
         """
         Vectorized calculation of the ground swath.
         :return: Nothing returned
         """
+
+        print("Starting Swath Computation...", file=sys.stderr)
 
         # Get the time space
         time_space = np.arange(self.start_time, self.end_time + self.temporal_resolution,
@@ -207,105 +243,57 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         # Get planet axes
         a, b, c = self.planet.get_axes()
 
-        # Get the number of rays to intercept with DSK in accordance with spatial resolution
-        num_theta = int((2 * np.pi / self.spatial_resolution) * np.average((a, b, c)))
-
-        print("Getting satellite positions...", file=sys.stderr)
+        print("     Getting satellite positions...", file=sys.stderr)
 
         # Get positions and velocities of the satellite for the observation times
         satellite_positions, satellite_velocities = self.campaign.get_states(times=time_space)
 
-        # Normalize the velocity and position vectors
-        vhats = np.asarray([satellite_velocity / np.linalg.norm(satellite_velocity)
-                            for satellite_velocity in satellite_velocities])
-        rhats = np.asarray([sat_position / np.linalg.norm(sat_position)
-                            for sat_position in satellite_positions])
+        print("     Getting antenna beam sampling...", file=sys.stderr)
 
-        # Get the azimuthal unit vectors
-        # Use radial direction instead of projection (more stable)
-        u1s = [-rhat for rhat in rhats]  # radially inward
+        # Get the number of rays to intercept with DSK in accordance with spatial resolution (rough approximation)
+        ang_span = np.deg2rad(self.instrument.end_look_angle - self.instrument.start_look_angle)
+        mean_height = np.mean(np.linalg.norm(satellite_positions, axis=1) - np.mean((a, b, c)))
+        mean_range = mean_height / np.cos(np.mean(ang_span))
+        num_theta = int((ang_span / self.spatial_resolution) * mean_range)
 
-        if self.instrument.look_direction == "right":
-            u2s = [-np.cross(vhat, u1) for vhat, u1 in zip(vhats, u1s)]
-        elif self.instrument.look_direction == "left":
-            u2s = [np.cross(vhat, u1) for vhat, u1 in zip(vhats, u1s)]
-        else:
-            raise ValueError("Invalid look direction. Must be 'left' or 'right'.")
-        u2s = [u2 / np.linalg.norm(u2) for u2 in u2s]
+        # Get look angle array
+        thetas = np.linspace(self.instrument.start_look_angle, self.instrument.end_look_angle, num_theta)
+        thetas = np.deg2rad(thetas)
 
-        swath_beams = []
+        print("     Getting lines of sight...", file=sys.stderr)
+        line_of_sight_vectors = self.create_line_of_sight(position=satellite_positions,
+                                                          velocity=satellite_velocities,
+                                                          thetas=thetas, look_direction=self.instrument.look_direction,
+                                                          force_zero_doppler=force_zero_doppler)
 
-        # Iterate through each azimuthal beam
-        for i in tqdm(range(len(time_space)), desc="Calculating planet surface intersects..."):
+        print("     Getting intercept points and local look, incident angles...", file=sys.stderr)
+        icp = np.zeros(line_of_sight_vectors.shape)
+        incidence_angles = np.zeros((line_of_sight_vectors.shape[0], line_of_sight_vectors.shape[1]))
+        non_projected_incidence_angles = np.zeros((line_of_sight_vectors.shape[0], line_of_sight_vectors.shape[1]))
+        look_angles = np.zeros((line_of_sight_vectors.shape[0], line_of_sight_vectors.shape[1]))
 
-            ray_dirs = [np.cos(np.deg2rad(theta)) * u1s[i] + np.sin(np.deg2rad(theta)) * u2s[i]
-                        for theta in np.linspace(self.instrument.start_look_angle,
-                                                 self.instrument.end_look_angle, num_theta)]
+        for pp in tqdm(range(satellite_positions.shape[0])):
+            icp[pp, :, :], incidence_angles[pp, :], non_projected_incidence_angles[pp, :], look_angles[pp, ::] = (
+                self.planet.get_surface_intersects_local_angles(
+                    satellite_position=satellite_positions[pp, :],
+                    raydirs=line_of_sight_vectors[pp, :, :]))
 
-            # Get the intersects with the planet DSK
-            intersects = self.planet.get_surface_intersects(vertex=satellite_positions[i], raydirs=ray_dirs)
+        cartesian_positions = np.reshape(icp, (icp.shape[0] * icp.shape[1], 3))
+        flat_incidence_angles = np.reshape(incidence_angles, incidence_angles.size)
+        flat_non_projected_incidence_angles =\
+            np.reshape(non_projected_incidence_angles, non_projected_incidence_angles.size)
+        flat_look_angles = np.reshape(look_angles, look_angles.size)
+        flat_times = np.reshape(np.tile(time_space[:, np.newaxis], (1, icp.shape[1])), icp.shape[0] * icp.shape[1])
 
-            # Make groundTarget objects with the intersects
-            swath_beams.append([[intersect[0], intersect[1], intersect[2]] for intersect in intersects
-                                if intersect[0] is not np.nan])
-
-        # Calculate the look angle of each GroundTarget for each beam
-        look_angles = self.get_angles_cartesian(swath_beams=swath_beams,
-                                                times=time_space, satellite_positions=satellite_positions)
-
-        cartesian_positions = np.asanyarray([coord for sublist in swath_beams for coord in sublist])
-        flat_angles = np.asarray([angle for sublist in look_angles for angle in sublist])
-        times = [[time] * len(beams) for time, beams in zip(time_space, swath_beams)]
-        flat_times = np.asarray([time for sublist in times for time in sublist])
+        print("     Coordinate conversion...", file=sys.stderr)
         swath_coordinates = self.convert_positions(cartesian_positions=cartesian_positions)
 
         self.create_data_array(cartesian_coordinates=cartesian_positions, geodetic_coordinates=swath_coordinates,
-                               look_angles=flat_angles, times=flat_times)
+                               incidence_angles=flat_incidence_angles,
+                               non_projected_incidence_angles= flat_non_projected_incidence_angles,
+                               look_angles=flat_look_angles, times=flat_times)
 
-
-    def get_angles_cartesian(self, swath_beams, times, satellite_positions):
-        """
-        Get the look angles between the GroundTargets and the satellite in degrees.
-        :param swath_beams: Azimuthal beams of the swath
-        :param times: Times of observation
-        :param satellite_positions: Array of x, y, z, positions of the satellite
-        :return: Absolute look angle between the surface points and the corresponding satellite position in degrees
-        """
-
-        # Calculate the satellite intersects and heights with the shape
-        intersects, satellite_heights = self.planet.get_sub_obs_points(times=times, campaign=self.campaign)
-
-        # Calculate the distance between center and satellite intersects
-        satellite_radii = np.asarray([np.linalg.norm(intersect - [0, 0, 0]) for intersect in intersects])
-
-        # Iterate through the beams
-        look_angles_per_beam = []
-        for i in tqdm(range(len(swath_beams)), desc="Calculating look angles..."):
-
-            # Get surface positions per beam
-            surface_positions = np.asarray([(point[0], point[1], point[2]) for point in swath_beams[i]])
-
-            # Get the distance between the satellite and the surface points
-            distances = np.asarray([np.linalg.norm(surface_position - satellite_positions[i])
-                                    for surface_position in surface_positions])
-
-            # Calculate cosines of the angles
-            z_plus_re = satellite_heights[i] + satellite_radii[i]
-            altitude = np.asarray([np.linalg.norm(surface_position - [0, 0, 0])
-                                   for surface_position in surface_positions])
-            cosine_look_angle = (distances ** 2 + z_plus_re ** 2 - altitude ** 2) / (2 * distances * z_plus_re)
-
-            # Use arc cosine to get the angles in radians
-            look_angles_radians = np.arccos(cosine_look_angle)
-
-            # Convert radians to degrees
-            look_angles_degrees = np.degrees(look_angles_radians)
-
-            # Yield output
-            look_angles_per_beam.append(look_angles_degrees)
-
-        # Return the look angles 2-D array
-        return look_angles_per_beam
+        print("Swath calculation finished!", file=sys.stderr)
 
     def visualize_swath(self, projection, fig=None, globe=None, ax=None, return_fig=False):
         """
@@ -319,7 +307,6 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
         """
 
         if fig is None:
-
             # Get the projection
             fig, ax, globe = projection.proj(planet=self.planet)
 
@@ -333,7 +320,6 @@ class Track(pet.component, family="pet.dataAcquisition.track", implements=pet.pr
 
         # return fig, ax, globe if necessary
         if return_fig:
-
             return fig, ax, globe
 
         # Add labels and legend
