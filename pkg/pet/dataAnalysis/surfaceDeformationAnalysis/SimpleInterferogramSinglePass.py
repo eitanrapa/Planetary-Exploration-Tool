@@ -12,6 +12,7 @@ import cartopy.crs as ccrs
 import cspyce as spice
 from scipy.optimize import root
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 import sys
 
 
@@ -50,26 +51,26 @@ class SimpleInterferogramSinglePass(pet.component,
     inverse_data = None
 
     @classmethod
-    def from_file(cls, planet, instrument, campaign, deformation_map, file_name):
+    def from_file(cls, planet, instrument, campaign, forward_phase_file_name, inverse_phase_file_name):
         """
         Load the interferogram from an HDF5 file
         :param planet: Planet object
         :param instrument: Instrument object
         :param campaign: Campaign object
-        :param deformation_map: Deformation map object
-        :param file_name: Name of the file to load
+        :param forward_phase_file_name: Name of the forward phase file
+        :param inverse_phase_file_name: Name of the inverse phase file (optional)
         :return: Interferogram object
         """
 
         # Open the HDF5 file in read mode
-        datatree = xr.open_datatree(filename_or_obj=file_name)
+        datatree = xr.open_datatree(filename_or_obj=forward_phase_file_name)
         track_da = datatree["track"].to_dataset()["track"]
         data = datatree["interferogram"]["forward_phases"]
 
         # Check if there is an inverse phase data array
-        try:
-            inverse_data = datatree["interferogram"]["inverse_phases"]
-        except KeyError:
+        if inverse_phase_file_name is not None:
+            inverse_data = xr.open_dataarray(filename_or_obj=inverse_phase_file_name)
+        else:
             inverse_data = None
 
         # Create the track object
@@ -78,8 +79,7 @@ class SimpleInterferogramSinglePass(pet.component,
 
         # Create the interferogram object
         obj = cls(name="igram" + str(np.random.rand()),
-                  planet=planet, instrument=instrument, campaign=campaign,
-                  deformation_map=deformation_map, track=track,
+                  planet=planet, instrument=instrument, campaign=campaign, track=track,
                   baseline=data.attrs["baseline"], baseline_uncertainty=data.attrs["baseline_uncertainty"],
                   roll=data.attrs["roll"], roll_uncertainty=data.attrs["roll_uncertainty"])
 
@@ -89,30 +89,47 @@ class SimpleInterferogramSinglePass(pet.component,
         return obj
 
     @classmethod
-    def from_files(cls, planet, instrument, campaign, deformation_map, file_list):
+    def from_files(cls, planet, instrument, campaign, forward_file_list, inverse_file_list=None):
         """
         Load a list of interferograms from a list of HDF5 files
         :param planet: Planet object
         :param instrument: Instrument object
         :param campaign: Campaign object
-        :param deformation_map: Deformation map object
-        :param file_list: List of files to load
+        :param forward_file_list: List of forward phase file names
+        :param inverse_file_list: List of inverse phase file names (optional)
         :return: List of interferogram objects
         """
 
-        # Load all the files
-        return [cls.from_file(planet=planet, instrument=instrument, campaign=campaign, deformation_map=deformation_map,
-                              file_name=file) for file in file_list]
+        if inverse_file_list is None:
+            inverse_file_list = [None] * len(forward_file_list)
 
-    def save(self, file_name):
+        if len(inverse_file_list) != len(forward_file_list):
+            raise ValueError("The number of forward phase files must match the number of inverse phase files.")
+
+        # Load all the files
+        return [cls.from_file(planet=planet, instrument=instrument, campaign=campaign,
+                              forward_phase_file_name=forward_file, inverse_phase_file_name=inverse_file) for
+                forward_file, inverse_file in zip(forward_file_list, inverse_file_list)]
+
+    def save_forward(self, file_name):
         """
-        Save the track to an HDF5 file
+        Save the track and forward calculations to an HDF5 file
         :param file_name: Name of the file to save
         :return: Nothing returned
         """
 
         # Open HDF5 file
-        self.data.to_netcdf(file_name, engine="netcdf4")
+        self.forward_data.to_netcdf(file_name, engine="netcdf4")
+
+    def save_inverse(self, file_name):
+        """
+        Save the inverse calculations to an HDF5 file
+        :param file_name: Name of the file to save
+        :return: Nothing returned
+        """
+
+        # Open HDF5 file
+        self.inverse_data.to_netcdf(file_name, engine="netcdf4")
 
     def create_forward_data_array(self, phases, corrs, nlooks, sigma_phase, sigma_height, sigma_disp,
                                   nesn, sigma0):
@@ -150,14 +167,13 @@ class SimpleInterferogramSinglePass(pet.component,
                 "height": ("points", self.track.data["height"].values)},
             name="forward_phases",
             attrs=dict(
-                deformation_map=self.deformation_map.pyre_name,
                 body_id=self.campaign.body_id,
                 baseline=self.baseline,
                 baseline_uncertainty=self.baseline_uncertainty,
                 roll=self.roll,
                 roll_uncertainty=self.roll_uncertainty,
-                start_time=self.track.start_time + self.time_offset_first_acquisition,
-                end_time=self.track.end_time + self.time_offset_first_acquisition
+                start_time=self.track.start_time,
+                end_time=self.track.end_time
             ),
         )
 
@@ -167,14 +183,14 @@ class SimpleInterferogramSinglePass(pet.component,
             "track": xr.Dataset({"track": self.track.data})
         })
 
-        self.data = dt
+        self.forward_data = dt
 
-    def create_inverse_data_array(self, phase_ref, psis, kz_k, inc_ang_k):
+    def create_inverse_data_array(self, phases_ref, kz_k, recovered_dem):
         """
         Create a xarray with the input data
-        :param phase_ref: Reference phase
+        :param phases_ref: Reference phases
         :param kz_k: Vertical interferometric wavenumber
-        :param incAng_k: Incidence angle
+        :param recovered_dem: Recovered DEM
         :return: Nothing returned
         """
 
@@ -184,9 +200,11 @@ class SimpleInterferogramSinglePass(pet.component,
             dims=["points"],
             coords={
                 "time": ("points", self.track.data["time"].values),
-                "phase_ref": ("points", phase_ref),
-                "kz": ("points", kz_k),
-                "incidence_angle": ("points", inc_ang_k),
+                "phase_ref": ("points", phases_ref),
+                "kz_k": ("points", kz_k),
+                "recovered_x": ("points", recovered_dem[:, 0]),
+                "recovered_y": ("points", recovered_dem[:, 1]),
+                "recovered_z": ("points", recovered_dem[:, 2]),
                 "x": ("points", self.track.data["x"].values),
                 "y": ("points", self.track.data["y"].values),
                 "z": ("points", self.track.data["z"].values),
@@ -195,18 +213,17 @@ class SimpleInterferogramSinglePass(pet.component,
                 "height": ("points", self.track.data["height"].values)},
             name="inverse_phases",
             attrs=dict(
-                deformation_map=self.deformation_map.pyre_name,
                 body_id=self.campaign.body_id,
                 baseline=self.baseline,
                 baseline_uncertainty=self.baseline_uncertainty,
                 roll=self.roll,
                 roll_uncertainty=self.roll_uncertainty,
-                start_time=self.track.start_time + self.time_offset_first_acquisition,
-                end_time=self.track.end_time + self.time_offset_first_acquisition
+                start_time=self.track.start_time,
+                end_time=self.track.end_time
             ),
         )
 
-        self.data = inverse_phases_da
+        self.inverse_data = inverse_phases_da
 
     @staticmethod
     def compute_local_coordsystem(p_sat, v_sat):
@@ -250,7 +267,16 @@ class SimpleInterferogramSinglePass(pet.component,
     @staticmethod
     def solve_insar(vars, phi, wavelength, p_m, p_s, v_m, rho, doppler):
         """
-
+        Solve the InSAR equations to get geocoded dem
+        :param vars: positions
+        :param phi: reference phases
+        :param wavelength: wavelength of the instrument
+        :param p_m: position with uncertainty of the first antenna
+        :param p_s: position with uncertainty of the second antenna
+        :param v_m: velocity of the first antenna
+        :param rho: distance to the first antenna
+        :param doppler: Doppler frequency
+        :return: residuals of the equations
         """
 
         p = np.array(vars)
@@ -261,7 +287,17 @@ class SimpleInterferogramSinglePass(pet.component,
     @staticmethod
     def solve_geocode_ellipsoid(vars, wavelength, p_m, v_m, rho, doppler, a, b, c):
         """
-
+        Solve the geocode equations for an ellipsoid
+        :param vars: positions
+        :param wavelength: wavelength of the instrument
+        :param p_m: position with uncertainty of the first antenna
+        :param v_m: velocity of the first antenna
+        :param rho: distance to the first antenna
+        :param doppler: Doppler frequency
+        :param a: semi-major axis of the ellipsoid
+        :param b: semi-minor axis of the ellipsoid
+        :param c: semi-minor axis of the ellipsoid
+        :return: residuals of the equations
         """
 
         p = np.array(vars)
@@ -269,10 +305,16 @@ class SimpleInterferogramSinglePass(pet.component,
                 np.linalg.norm(p - p_m) - rho,
                 (-2 / wavelength * np.dot(v_m, (p - p_m)) / np.linalg.norm((p - p_m))) * 2e3 - doppler * 2e3]
 
-    @staticmethod
-    def solve_geocode_dem(vars, wavelength, p_m, v_m, rho, doppler, dem_file):
+    def solve_geocode_dem(self, vars, wavelength, p_m, v_m, rho, doppler, dem_file):
         """
-
+        Solve the geocode equations for a DEM
+        :param vars: positions
+        :param wavelength: wavelength of the instrument
+        :param p_m: position with uncertainty of the first antenna
+        :param v_m: velocity of the first antenna
+        :param rho: distance to the first antenna
+        :param doppler: Doppler frequency
+        :param dem_file: DEM file to use for the geocoding
         """
 
         p = np.array(vars)
@@ -283,6 +325,11 @@ class SimpleInterferogramSinglePass(pet.component,
     @staticmethod
     def get_dem_incidence_angles(dem_file, satellite_position, los):
         """
+        Get the incidence angles for an arbitrary DEM file
+        :param dem_file: DEM file to use
+        :param satellite_position: Position of the satellite
+        :param los: Lines of sight from the satellite to the ground targets
+        :return: Incidence angles in degrees
         """
 
         # Create a file manager
@@ -334,6 +381,10 @@ class SimpleInterferogramSinglePass(pet.component,
     @staticmethod
     def get_dem_distance_from_surface(dem_file, point):
         """
+        Get the distance from a point to the surface of a DEM file
+        :param dem_file: DEM file to use
+        :param point: Point in Cartesian coordinates (x, y, z) in meters
+        :return: Distance from the point to the surface of the DEM file in meters
         """
 
         # Create a file manager
@@ -345,6 +396,9 @@ class SimpleInterferogramSinglePass(pet.component,
         # Retrieve the DSK handle for a second loaded dsk file
         handle = spice.kdata(which=1, kind="dsk")[3]
 
+        # Retrieve the DSK DLA
+        dla = spice.dlabfs(handle=handle)
+
         # # Use the SPICE toolkit to calculate the intersects
         intersect = spice.dskx02(handle=handle, dladsc=dla, vertex=point*1e-3*1.1, raydir= -1*point)[1]
 
@@ -355,7 +409,9 @@ class SimpleInterferogramSinglePass(pet.component,
 
     def get_satellite_positions(self):
         """
-
+        Get the satellite positions and velocities for the two antennas
+        :return: satellite_positions1, satellite_velocity1, satellite_positions2, satellite_velocity2,
+                 positions, lines_of_sight, f_doppler
         """
 
         print("Starting the interferogram calculation for the topography...", file=sys.stderr)
@@ -372,7 +428,7 @@ class SimpleInterferogramSinglePass(pet.component,
 
         # Get satellite positions and velocities of first orbit
         satellite_positions1, satellite_velocity1 = \
-            self.campaign.get_states(times=self.track.data["times"].values)
+            self.campaign.get_states(times=self.track.data["time"].values)
 
         # Get lines of sight and Doppler frequency
         lines_of_sight = positions - satellite_positions1
@@ -381,7 +437,6 @@ class SimpleInterferogramSinglePass(pet.component,
 
         # Make roll angle and uncertainty in radians
         roll = np.deg2rad(self.roll)
-        roll_uncertainty = np.deg2rad(self.roll_uncertainty)
 
         print("     Getting satellite positions of orbit 2 by applying offset...", file=sys.stderr)
         base_rad = self.baseline * np.sin(roll)
@@ -392,7 +447,22 @@ class SimpleInterferogramSinglePass(pet.component,
                                                                                v_sat=satellite_velocity1,
                                                                                dy0=base_hor, dz0=base_rad)
 
+        return (satellite_positions1, satellite_velocity1, satellite_positions2, satellite_velocity2,
+                positions, lines_of_sight, f_doppler)
+
+    def get_satellite_positions_knowledge(self, satellite_positions1, satellite_velocity1):
+        """
+        Get the satellite positions and velocities for the two antennas with knowledge uncertainties
+        :param satellite_positions1: Satellite positions of the first orbit
+        :param satellite_velocity1: Satellite velocities of the first orbit
+        :return: satellite_positions_k1, satellite_velocity_k1, satellite_positions_k2, satellite_velocity_k2
+        """
+
         print("     Getting satellite position knowledge of the orbits...", file=sys.stderr)
+
+        # Make roll angle and uncertainty in radians
+        roll = np.deg2rad(self.roll)
+        roll_uncertainty = np.deg2rad(self.roll_uncertainty)
 
         # Get satellite positions and velocity knowledge of first orbit
         satellite_positions_k1, satellite_velocity_k1 = satellite_positions1, satellite_velocity1
@@ -405,13 +475,16 @@ class SimpleInterferogramSinglePass(pet.component,
                                                                                  v_sat=satellite_velocity1,
                                                                                  dy0=base_hor_k, dz0=base_rad_k)
 
-        return (satellite_positions1, satellite_velocity1, satellite_positions2, satellite_velocity2,
-                satellite_positions_k1, satellite_velocity_k1, satellite_positions_k2, satellite_velocity_k2,
-                positions, lines_of_sight, f_doppler)
+        return satellite_positions_k1, satellite_velocity_k1, satellite_positions_k2, satellite_velocity_k2
 
     @staticmethod
     def get_perpendicular_baseline(satellite_positions1, satellite_positions2, lines_of_sight):
         """
+        Get the perpendicular baseline between two satellite positions
+        :param satellite_positions1: Satellite positions of the first antenna
+        :param satellite_positions2: Satellite positions of the second antenna
+        :param lines_of_sight: Lines of sight from the satellite to the ground targets
+        :return: b_perp: Perpendicular baseline
         """
 
         b_vec = satellite_positions2 - satellite_positions1
@@ -429,8 +502,8 @@ class SimpleInterferogramSinglePass(pet.component,
         :return: Nothing returned
         """
 
-        satellite_positions1, satellite_velocity1, satellite_positions2, satellite_velocity2, \
-        _, _, _, _, positions, lines_of_sight, _ = self.get_satellite_positions()
+        (satellite_positions1, satellite_velocity1, satellite_positions2, satellite_velocity2,
+        positions, lines_of_sight, _) = self.get_satellite_positions()
 
         print("     Forward computation of the interferometric phase of the topography...", file=sys.stderr)
 
@@ -438,7 +511,7 @@ class SimpleInterferogramSinglePass(pet.component,
         distances1 = np.linalg.norm(positions - satellite_positions1, axis=-1)
         distances2 = np.linalg.norm(positions - satellite_positions2, axis=-1)
 
-        phase_topo_forward = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2 - distances1)
+        phases_forward = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2 - distances1)
 
         # compute performance and noise-----------------------------------------
         print("     Get performance and noise...", file=sys.stderr)
@@ -450,29 +523,37 @@ class SimpleInterferogramSinglePass(pet.component,
         sigma_phase, sigma_height, sigma_disp, corr_tot, n_looks, nesn, sigma0 = self.instrument.get_instrument_noise(
             planet=self.planet,
             perpendicular_baseline=b_perp,
-            satellite_velocity=satellite_velocity1,
+            satellite_velocities=satellite_velocity1,
             look_angles=self.track.data.values,
             incidence_angles=self.track.data["incidence_angle"].values,
             non_projected_incidence_angles=self.track.data["non_projected_incidence_angle"].values,
-            distances=distances1)
+            distances=distances1, variable_backscatter=True)
 
-        noise = np.random.normal(loc=0, scale=sigma_phase, size=len(phase_topo_forward))
+        noise = np.random.normal(loc=0, scale=sigma_phase, size=len(phases_forward))
 
         print("        Noise mean meas:" + str(np.mean(noise)) + "...", file=sys.stderr)
         print("        Noise std meas:" + str(np.std(noise)) + "...", file=sys.stderr)
 
-        self.create_forward_data_array(phases=phase_topo_forward,
+        self.create_forward_data_array(phases=phases_forward,
                                        sigma_phase=sigma_phase, sigma_height=sigma_height, sigma_disp=sigma_disp,
-                                       correlation=corr_tot, nlooks=n_looks, nesn=nesn, sigma0=sigma0)
+                                       corrs=corr_tot, nlooks=n_looks, nesn=nesn, sigma0=sigma0)
 
     def get_igram_inversion(self, use_dem="exact", dem_file=None):
         """
-
+        Calculate the interferogram inversion to get the topography and reference phases
+        :param use_dem: Method to use for the DEM ('exact', 'reference', 'ellipsoid')
+        :param dem_file: DEM file to use for the geocoding (if use_dem is 'reference')
+        :return: Nothing returned
         """
 
-        satellite_positions1, satellite_velocity1, satellite_positions2, satellite_velocity2, \
-        satellite_positions_k1, satellite_velocity_k1, satellite_positions_k2, satellite_velocity_k2, \
-        positions, lines_of_sight, f_doppler = self.get_satellite_positions()
+        (satellite_positions1, satellite_velocity1, _, _,
+        positions, lines_of_sight, f_doppler) = self.get_satellite_positions()
+
+        distances1 = np.linalg.norm(positions - satellite_positions1, axis=-1)
+
+        satellite_positions_k1, satellite_velocity_k1, satellite_positions_k2, satellite_velocity_k2 = \
+        self.get_satellite_positions_knowledge(satellite_positions1=satellite_positions1,
+                                               satellite_velocity1=satellite_velocity1)
 
         phases_forward = self.forward_data["interferogram"]["forward_phases"].values
 
@@ -489,7 +570,7 @@ class SimpleInterferogramSinglePass(pet.component,
             distances1_ref = np.linalg.norm(positions - satellite_positions_k1, axis=-1)
             distances2_ref = np.linalg.norm(positions - satellite_positions_k2, axis=-1)
 
-            phase_ref = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2_ref - distances1_ref)
+            phases_ref = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2_ref - distances1_ref)
 
         elif use_dem == 'reference':
 
@@ -501,13 +582,13 @@ class SimpleInterferogramSinglePass(pet.component,
             for ii in tqdm(range(len(distances1))):
                 res = root(self.solve_geocode_dem, positions[ii, :] + np.random.normal(0, 1e3, 3),
                            args=(self.instrument.wavelength, satellite_positions1[ii, :],
-                                 satellite_velocity_k1[ii, :], distances1[ii], f_doppler[ii], dem_file, self.planet))
+                                 satellite_velocity_k1[ii, :], distances1[ii], f_doppler[ii], dem_file))
                 positions_reference[ii, :] = res.x
 
             distances1_ref = np.linalg.norm(positions_reference - satellite_positions_k1, axis=-1)
             distances2_ref = np.linalg.norm(positions_reference - satellite_positions_k2, axis=-1)
 
-            phase_ref = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2_ref - distances1_ref)
+            phases_ref = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2_ref - distances1_ref)
 
         elif use_dem == 'ellipsoid':
 
@@ -519,13 +600,13 @@ class SimpleInterferogramSinglePass(pet.component,
             for ii in tqdm(range(len(distances1))):
                 res = root(self.solve_geocode_ellipsoid, positions[ii, :],
                            args=(self.instrument.wavelength, satellite_positions1[ii, :],
-                                 satellite_velocityK1[ii, :], distances1[ii], fDoppler[ii],
+                                 satellite_velocity_k1[ii, :], distances1[ii], f_doppler[ii],
                                  a, b, c))
                 positions_ellipsoid[ii, :] = res.x
-            distances1_ref = np.linalg.norm(positionsEllipsoid - satellite_positionsK1, axis=-1)
-            distances2_ref = np.linalg.norm(positionsEllipsoid - satellite_positionsK2, axis=-1)
+            distances1_ref = np.linalg.norm(positions_ellipsoid - satellite_positions_k1, axis=-1)
+            distances2_ref = np.linalg.norm(positions_ellipsoid - satellite_positions_k2, axis=-1)
 
-            phase_ref = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2_ref - distances1_ref)
+            phases_ref = 4 * np.pi * (1 / self.instrument.wavelength) * (distances2_ref - distances1_ref)
 
         else:
             raise ValueError("useDEM must be 'exact', 'reference' or 'ellipsoid'!")
@@ -536,7 +617,7 @@ class SimpleInterferogramSinglePass(pet.component,
         recovered_dem = np.zeros(positions.shape)
         for ii in tqdm(range(len(phases_forward))):
             # define variables
-            res = root(self.solve_insar, positions[ii, :], args=(phase_ref[ii],
+            res = root(self.solve_insar, positions[ii, :], args=(phases_ref[ii],
                                                            self.instrument.wavelength, satellite_positions_k1[ii, :],
                                                            satellite_positions_k2[ii, :], satellite_velocity_k1[ii, :],
                                                            distances1[ii], f_doppler[ii]))
@@ -567,7 +648,7 @@ class SimpleInterferogramSinglePass(pet.component,
             print("        Using reference DEM...", file=sys.stderr)
 
             # get incident angle
-            inc_ang_k = self.get_dem_incidence_angles(dem_file=dem_file, satellite_positions=satellite_positions_k1,
+            inc_ang_k = self.get_dem_incidence_angles(dem_file=dem_file, satellite_position=satellite_positions_k1,
                                                       los=los_k)
 
         elif use_dem == 'ellipsoid':
@@ -581,7 +662,7 @@ class SimpleInterferogramSinglePass(pet.component,
         # get vertical interferometric wavenumber kz
         kz_k = 4 * np.pi / self.instrument.wavelength * b_perp_k / distances1_ref / np.sin(inc_ang_k)
 
-        self.create_inverse_data_array(phase_ref=phases_ref,
+        self.create_inverse_data_array(phases_ref=phases_ref,
                                        kz_k=kz_k, recovered_dem=recovered_dem)
 
         print("Finished the interferogram calculations!", file=sys.stderr)
@@ -602,13 +683,15 @@ class SimpleInterferogramSinglePass(pet.component,
             fig, ax, globe = projection.proj(planet=self.planet)
 
         # Load the values to plot
-        longitudes = self.data["longitude"].values
-        latitudes = self.data["latitude"].values
-        phases = self.data.values
+        longitudes = self.forward_data["longitude"].values
+        latitudes = self.forward_data["latitude"].values
+        forward_phases = self.forward_data.values
+        inverse_phases = self.inverse_data.values
+
+        phases = forward_phases - inverse_phases
 
         # Wrap interferogram
-        phases = np.fmod(phases, 2 * np.pi)
-        phases = [angle + 2 * np.pi if angle < 0 else angle for angle in phases]
+        phases = np.mod(phases, 2 * np.pi)
 
         # Make the colormap cyclical
         cm = plt.cm.get_cmap('hsv')
@@ -628,12 +711,10 @@ class SimpleInterferogramSinglePass(pet.component,
         plt.title('Interferogram', pad=20)
 
         # Save the plot
-        plt.savefig(fname=projection.folder_path + '/' + 'interferogram_' + self.deformation_map.pyre_name + '_' +
+        plt.savefig(fname=projection.folder_path + '/' + 'interferogram_single_pass' + '_' +
                     str(self.campaign.body_id) +
-                    '_' + str(self.track.start_time + self.time_offset_first_acquisition) + '_' + str(
-                        self.track.end_time + self.time_offset_first_acquisition) +
-                    '_' + str(self.track.start_time + self.time_offset_second_acquisition) +
-                    '_' + str(self.track.end_time + self.time_offset_second_acquisition) + '.png', format='png',
+                    '_' + str(self.track.start_time) + '_' + str(
+                    self.track.end_time) + '.png', format='png',
                     dpi=500)
 
 # end of file

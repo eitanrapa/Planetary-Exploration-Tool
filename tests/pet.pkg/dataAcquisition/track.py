@@ -29,8 +29,8 @@ times = campaign.get_five_tracks()
 
 # First track
 track1 = pet.dataAcquisition.track(name="track1", start_time=times[0], end_time=times[1], planet=planet,
-                                   campaign=campaign, instrument=instrument, spatial_resolution=2000,
-                                   temporal_resolution=60)
+                                   campaign=campaign, instrument=instrument, spatial_resolution=500,
+                                   temporal_resolution=15)
 
 # Calculate the positions
 track1.calculate_ground_swath()

@@ -30,48 +30,65 @@ times = campaign.get_five_tracks()
 # Get the orbit cycle time of the instrument
 orbit_cycle_time = campaign.orbit_cycle
 
+# Make a displacement map
+deformation_map = pet.natureSimulations.geophysicalModel.tidalDeformationMap(name="base",
+                                                                             displacement_data_path="/home/user/"
+                                                                                                    "Documents/GitHub/"
+                                                                                                    "Planetary-"
+                                                                                                    "Exploration-Tool/"
+                                                                                                    "input/"
+                                                                                                    "Simulation_Base"
+                                                                                                    "_Results.hdf5",
+                                                                             planet=planet)
+
 # First track
 track = pet.dataAcquisition.track.from_file(planet=planet, campaign=campaign, instrument=instrument,
                                             file_name="/home/user/Documents/GitHub/"
                                                        "Planetary-Exploration-Tool/files/track1")
 
-# Specify the baseline
-baseline = 4
-# Specify the basline uncertainty
-baseline_uncertainty = 0. #10
-# Specify the baseline orientation (roll=0 means horizontal)
-roll = 23.5
-# Specify the roll uncertainty
-roll_uncertainty = 0. #-8 / 3600
-
-# compute the interferogram
-interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogramSinglePass(name="igram",
-                                                                                instrument=instrument,
-                                                                                planet=planet,
-                                                                                track=track,
-                                                                                campaign=campaign,
-                                                                                baseline=baseline,
-                                                                                baseline_uncertainty=baseline_uncertainty,
-                                                                                roll=roll,
-                                                                                roll_uncertainty=roll_uncertainty)
-# Calculate interferogram
-interferogram.calculate_igram()
-
-# Save interferogram
-interferogram.save_forward(file_name="/home/user/Documents/GitHub/"
-                             "Planetary-Exploration-Tool/files/igram_base_forward_1")
-
-# Calculate phase inverse
-interferogram.get_igram_inversion(use_dem="ellipsoid")
-
-# Save interferogram
-interferogram.save_inverse(file_name="/home/user/Documents/GitHub/"
-                             "Planetary-Exploration-Tool/files/igram_base_inverse_1")
+# # Specify the baseline
+# baseline = 4
+# # Specify the basline uncertainty
+# baseline_uncertainty = 0. #10
+# # Specify the baseline orientation (roll=0 means horizontal)
+# roll = 23.5
+# # Specify the roll uncertainty
+# roll_uncertainty = 0. #-8 / 3600
+#
+# # compute the interferogram
+# interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogramRepeatPass(name="igram",
+#                                                                                 instrument=instrument,
+#                                                                                 planet=planet,
+#                                                                                 track=track,
+#                                                                                 campaign=campaign,
+#                                                                                 deformation_map=deformation_map,
+#                                                                                 baseline=baseline,
+#                                                                                 baseline_uncertainty=baseline_uncertainty,
+#                                                                                 roll=roll,
+#                                                                                 roll_uncertainty=roll_uncertainty,
+#                                                                                 time_offset_second_acquisition=
+#                                                                                           orbit_cycle_time)
+# # Calculate interferogram
+# interferogram.calculate_igram()
+#
+# # Save interferogram
+# interferogram.save_forward(file_name="/home/user/Documents/GitHub/"
+#                              "Planetary-Exploration-Tool/files/igram_base_forward_1")
+#
+# # Calculate phase inverse
+# interferogram.get_igram_inversion(use_dem="ellipsoid")
+#
+# # Save interferogram
+# interferogram.save_inverse(file_name="/home/user/Documents/GitHub/"
+#                              "Planetary-Exploration-Tool/files/igram_base_inverse_1")
 
 # Load the interferogram
-interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogramSinglePass.from_file(instrument=instrument,
+interferogram = pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogramRepeatPass.from_file(instrument=
+                                                                                                    instrument,
                                                                                           planet=planet,
                                                                                           campaign=campaign,
+                                                                                          deformation_map=
+                                                                                                    deformation_map,
                                                                                           forward_phase_file_name=
                                                                                                     "/home/user/"
                                                                                                     "Documents/"
@@ -97,6 +114,9 @@ projection = pet.projections.biaxialProjections.biaxialCylindrical(name="biaxial
 
 # Plot interferogram
 interferogram.visualize_interferogram(projection=projection)
+
+# Plot the displacements
+interferogram.visualize_displacements(projection=projection)
 
 fm.clear()
 
