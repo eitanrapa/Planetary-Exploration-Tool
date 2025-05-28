@@ -7,18 +7,19 @@
 
 import pet
 import xarray as xr
-import cspyce as spice
 import numpy as np
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import sys
 
 
-class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram",
-                          implements=pet.protocols.dataAnalysis.surfaceDeformationAnalysis):
+class SimpleInterferogramRepeatPass(pet.component,
+                                    family="pet.dataAnalysis.surfaceDeformationAnalysis.simpleInterferogram",
+                                    implements=pet.protocols.dataAnalysis.surfaceDeformationAnalysis):
     """
-    Class that creates a single interferogram between two points of a displacement map given an instrument orbit
+    Class that creates a single interferogram between two acquisitions given an instrument and orbit
     """
+
 
     planet = pet.protocols.planet()
     planet.doc = "target planet"
@@ -32,17 +33,19 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
     deformation_map = pet.protocols.natureSimulations.geophysicalModel()
     deformation_map.doc = "tidal deformation model"
 
-    track1 = pet.protocols.dataAcquisition()
-    track1.doc = "first track"
+    track = pet.protocols.dataAcquisition()
+    track.doc = "ground track"
 
-    track2 = pet.protocols.dataAcquisition()
-    track2.doc = "second track"
+    time_offset_first_acquisition = pet.properties.float()
+    time_offset_first_acquisition.default = 0
+    time_offset_first_acquisition.doc = "time offset between satellite position time and the first acquisition time"
 
-    baseline = pet.properties.float()
-    baseline.doc = "baseline between the two tracks [m]"
+    time_offset_second_acquisition = pet.properties.float()
+    time_offset_second_acquisition.default = 0
+    time_offset_second_acquisition.doc = "time offset between satellite position time and the second acquisition time"
 
-    baseline_uncertainty = pet.properties.float()
-    baseline_uncertainty.doc = "baseline uncertainty [m]"
+    perpendicular_baseline = pet.properties.float()
+    perpendicular_baseline.doc = "perpendicular baseline between the two acquisitions [m]"
 
     data = None
 
@@ -60,22 +63,20 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
 
         # Open the HDF5 file in read mode
         datatree = xr.open_datatree(filename_or_obj=file_name)
-        track1_da = datatree["track1"].to_dataset()["track1"]
-        track2_da = datatree["track2"].to_dataset()["track2"]
-        data = datatree["interferogram"]["los_displacements"]
+        track_da = datatree["track"].to_dataset()["track"]
+        data = datatree["interferogram"]["phases"]
 
-        # Create the track objects
-        track1 = pet.dataAcquisition.track.from_data_array(planet=planet, campaign=campaign, instrument=instrument,
-                                                           data=track1_da)
-        track2 = pet.dataAcquisition.track.from_data_array(planet=planet, campaign=campaign, instrument=instrument,
-                                                           data=track2_da)
+        # Create the track object
+        track = pet.dataAcquisition.track.from_data_array(planet=planet, campaign=campaign, instrument=instrument,
+                                                          data=track_da)
 
         # Create the interferogram object
         obj = cls(name="igram" + str(np.random.rand()),
                   planet=planet, instrument=instrument, campaign=campaign,
-                  deformation_map=deformation_map, track1=track1,
-                  track2=track2, baseline=data.attrs["baseline"],
-                  baseline_uncertainty=data.attrs["baseline_uncertainty"])
+                  deformation_map=deformation_map, track=track,
+                  time_offset_first_acquisition=data.attrs["time_offset_first_acquisition"],
+                  time_offset_second_acquisition=data.attrs["time_offset_second_acquisition"],
+                  perpendicular_baseline=data.attrs["perpendicular_baseline"])
 
         obj.data = data  # Restore computed result
 
@@ -107,47 +108,48 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         # Open HDF5 file
         self.data.to_netcdf(file_name, engine="netcdf4")
 
-    def create_data_array(self, los_displacements, psis):
+    def create_data_array(self, phases, psis, corrs, nlooks):
         """
         Create a xarray with the input data
-        :param los_displacements: displacement values measured in the LOS
+        :param phases: forward phases of interferogram
         :param psis: Flattened values
         :return: Nothing returned
         """
 
         # Create the xarray datarray
-        los_displacements_da = xr.DataArray(
-            data=los_displacements,
+        phases_da = xr.DataArray(
+            data=phases,
             dims=["points"],
             coords={
-                "sat_pos_time": ("points", self.track1.data["sat_pos_time"].values),
-                "time1": ("points", self.track1.data["time"].values),
-                "time2": ("points", self.track2.data["time"].values),
-                "psi": ("points", psis),
-                "x": ("points", self.track1.data["x"].values),
-                "y": ("points", self.track1.data["y"].values),
-                "z": ("points", self.track1.data["z"].values),
-                "latitude": ("points", self.track1.data["latitude"].values),
-                "longitude": ("points", self.track1.data["longitude"].values),
-                "height": ("points", self.track1.data["height"].values)},
-            name="los_displacements",
+                "time1": ("points", self.track.data["time"].values + self.time_offset_first_acquisition),
+                "time2": ("points", self.track.data["time"].values + self.time_offset_second_acquisition),
+                "psi_sub_baseline": ("points", psis),
+                "correlation": ("points", corrs),
+                "nlooks": ("points", nlooks),
+                "x": ("points", self.track.data["x"].values),
+                "y": ("points", self.track.data["y"].values),
+                "z": ("points", self.track.data["z"].values),
+                "latitude": ("points", self.track.data["latitude"].values),
+                "longitude": ("points", self.track.data["longitude"].values),
+                "height": ("points", self.track.data["height"].values)},
+            name="phases",
             attrs=dict(
                 deformation_map=self.deformation_map.pyre_name,
                 body_id=self.campaign.body_id,
-                baseline=self.baseline,
-                baseline_uncertainty=self.baseline_uncertainty,
-                start_time1=self.track1.start_time,
-                end_time1=self.track1.end_time,
-                start_time2=self.track2.start_time,
-                end_time2=self.track2.end_time,
+                perpendicular_baseline=self.perpendicular_baseline,
+                time_offset_first_acquisition=self.time_offset_first_acquisition,
+                time_offset_second_acquisition=self.time_offset_second_acquisition,
+                start_time1=self.track.start_time + self.time_offset_first_acquisition,
+                end_time1=self.track.end_time + self.time_offset_first_acquisition,
+                start_time2=self.track.start_time + self.time_offset_second_acquisition,
+                end_time2=self.track.end_time + self.time_offset_second_acquisition,
             ),
         )
 
         # Store them in a DataTree
         dt = xr.DataTree.from_dict({
-            "interferogram": xr.Dataset({"los_displacements": los_displacements_da}),
-            "track1": xr.Dataset({"track1": self.track1.data}),
-            "track2": xr.Dataset({"track2": self.track2.data}),
+            "interferogram": xr.Dataset({"phases": phases_da}),
+            "track": xr.Dataset({"track": self.track.data})
         })
 
         self.data = dt
@@ -183,33 +185,6 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         # Return the look angles 2-D array
         return look_angles_radians
 
-    def get_flattened_positions(self, positions, satellite_position):
-        """
-        Calculate the "flattened positions", or those in the plane of the observed positions from the satellite point
-        of view
-        :param positions: Positions on the DSK
-        :param satellite_position: Positions of the satellite when measuring positions
-        :return x, y, z coordinates of the flattened positions
-        """
-
-        # Get planet axes
-        a, b, c = self.planet.get_axes()
-
-        # Calculate vectors from the ground positions to the satellite
-        positions = np.asarray(positions)
-        ground_satellite_vectors = positions - satellite_position
-
-        # Create plates normal to the vector from the ground to the satellite at the ground position
-        planes = spice.nvp2pl_vector(normal=ground_satellite_vectors, point=positions)
-
-        # Generate ellipses from these planes that intersect the planet ellipsoid
-        ellipses = spice.inedpl_vector(a=a, b=b, c=c, plane=planes)[0]
-
-        # Get the "flattened" points from the intersection of ellipses and ground positions
-        flat_points = spice.npelpt_vector(point=positions, ellips=ellipses)[0]
-
-        return flat_points
-
     def calculate_igram(self):
         """
         Calculate the flattened phases between two swaths given a baseline
@@ -220,26 +195,48 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
 
         # For speed, calculate all points at once
         u_displacements, v_displacements, w_displacements = (
-            self.deformation_map.get_displacements(track=self.track1))
+            self.deformation_map.get_displacements(track=self.track,
+                                                   time_difference=self.time_offset_first_acquisition))
         displacements_1 = np.array([u_displacements, v_displacements, w_displacements]).T
 
         # For speed, calculate all points at once
         u_displacements, v_displacements, w_displacements = (
-            self.deformation_map.get_displacements(track=self.track2))
+            self.deformation_map.get_displacements(track=self.track,
+                                                   time_difference=self.time_offset_second_acquisition))
         displacements_2 = np.array([u_displacements, v_displacements, w_displacements]).T
 
         # Access x, y, z values
-        x = self.track1.data["x"].values
-        y = self.track1.data["y"].values
-        z = self.track1.data["z"].values
+        x = self.track.data["x"].values
+        y = self.track.data["y"].values
+        z = self.track.data["z"].values
 
-        # Get the positions of the groundTargets
+        # Get the positions
         positions = np.asarray([x, y, z]).T
 
         print("Getting satellite positions...", file=sys.stderr)
 
         # Get satellite positions and velocities
-        satellite_positions, _ = self.campaign.get_states(times=self.track1.data["sat_pos_time"].values)
+        satellite_positions, satellite_velocities = \
+            self.campaign.get_states(times=self.track.data["time"].values)
+
+        # Get the line-of-sight vectors
+        los_vectors = satellite_positions - positions
+
+        # Calculate the second satellite positions, assuming a b_perp
+        v_unit = [v_sat / np.linalg.norm(v_sat) for v_sat in satellite_velocities]
+        los_unit = [los / np.linalg.norm(los) for los in los_vectors]
+
+        cross_tracks = [np.cross(v_unit, los_unit) for v_unit, los_unit in zip(v_unit, los_unit)]
+        cross_track_unit = np.asarray([cross_track / np.linalg.norm(cross_track) for cross_track in cross_tracks])
+
+        # Calculate the second satellite positions
+        satellite_positions_plus_pb = satellite_positions + self.perpendicular_baseline * cross_track_unit
+
+        # Get the line-of-sight vectors
+        los_vectors_plus_pb = satellite_positions_plus_pb - positions
+
+        distances = np.asarray([np.linalg.norm(vector) for vector in los_vectors])
+        distances_plus_pb = np.asarray([np.linalg.norm(vector) for vector in los_vectors_plus_pb])
 
         print("Getting flattened points on the ellipsoid...", file=sys.stderr)
 
@@ -248,12 +245,12 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         print("Getting flattened angles...", file=sys.stderr)
 
         # Get flattened angles for the satellite positions and ground points
-        angles = self.get_flattened_angles(time=self.track1.data["sat_pos_time"].values,
-                                           satellite_position=satellite_positions, flat_positions=flattened_points)
+        angles_0 = self.get_flattened_angles(time=self.track.data["time"].values,
+                                             satellite_position=satellite_positions, flat_positions=flattened_points)
 
         # Get the distances from the flattened points to the satellites
         vectors = flattened_points - satellite_positions
-        distances = np.asarray([np.linalg.norm(vector) for vector in vectors])
+        distances_0 = np.asarray([np.linalg.norm(vector) for vector in vectors])
 
         # Calculate the vectors from the ground points to the satellite positions
         ground_satellite_vectors = satellite_positions - positions
@@ -272,14 +269,65 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
                                          for displacement, ground_satellite_vector
                                          in zip(displacements_2, ground_satellite_vectors)])
 
-        # Calculate displacement differences
-        los_displacements = los_displacements2 - los_displacements1
+        # Calculate the noise
+        sigma_noises, corrs, nlooks = self.instrument.get_instrument_noise(
+            planet=self.planet, baseline=self.perpendicular_baseline,
+            satellite_velocities=satellite_velocities, look_angle=look_angles,
+            incidence_angles=incidence_angles, distances=distances)
 
-        # Calculate flattened values
-        psis_sub_baseline = 1 / (distances * np.sin(angles))
+        forward_phases = (4 * np.pi * (1 / self.instrument.wavelength) * ((los_displacements2 - los_displacements1) +
+                                                                          (distances_plus_pb - distances)) +
+                          np.random.normal(loc=0, scale=sigma_noises, size=len(los_displacements1)))
+
+        # Calculate psis sub perpendicular baselines
+        psis_sub_baseline = 1 / (distances_0 * np.sin(angles_0))
 
         # Create array and save the data
-        self.create_data_array(los_displacements=los_displacements, psis=psis_sub_baseline)
+        self.create_data_array(phases=forward_phases, psis=psis_sub_baseline, corrs=corrs, nlooks=nlooks)
+
+    def get_inverse_phases(self, position1_error, position2_error, topography_error):
+        """
+
+        """
+
+        # Access x, y, z values
+        x = self.track.data["x"].values
+        y = self.track.data["y"].values
+        z = self.track.data["z"].values
+
+        # Get the positions
+        positions = np.asarray([x, y, z]).T
+
+        print("Getting satellite positions...", file=sys.stderr)
+
+        # Get satellite positions and velocities
+        satellite_positions, satellite_velocities = \
+            self.campaign.get_states(times=self.track.data["time"].values)
+
+        # Get the line-of-sight vectors
+        los_vectors = satellite_positions - positions
+
+        # Calculate the second satellite positions, assuming a b_perp
+        v_unit = [v_sat / np.linalg.norm(v_sat) for v_sat in satellite_velocities]
+        los_unit = [los / np.linalg.norm(los) for los in los_vectors]
+
+        cross_tracks = [np.cross(v_unit, los_unit) for v_unit, los_unit in zip(v_unit, los_unit)]
+        cross_track_unit = np.asarray([cross_track / np.linalg.norm(cross_track) for cross_track in cross_tracks])
+
+        # Calculate the second satellite positions
+        satellite_positions_plus_pb = satellite_positions + self.perpendicular_baseline * cross_track_unit
+
+        # Get the line-of-sight vectors
+        los_vectors_plus_pb = satellite_positions_plus_pb - positions
+
+        delta_distances = (np.asarray([np.linalg.norm(vector) for vector in los_vectors]) + position1_error +
+                           topography_error)
+        delta_distances_plus_pb = (np.asarray([np.linalg.norm(vector) for vector in los_vectors_plus_pb]) +
+                                   position2_error + topography_error)
+
+        phases_reference = 4 * np.pi * (1 / self.instrument.wavelength) * (delta_distances_plus_pb - delta_distances)
+
+        return self.data.values - phases_reference
 
     def visualize_interferogram(self, projection, fig=None, globe=None, ax=None, return_fig=False):
         """
@@ -299,14 +347,7 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         # Load the values to plot
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
-        heights = self.data["height"].values
-        los_displacements = self.data.values
-        psis = self.data["psi"].values
-        baseline = self.data.attrs["baseline"]
-        psis = psis * baseline
-
-        # Calculate the phases using the LOS displacements, baseline, geodetic heights, distances, angles
-        phases = 4 * np.pi * (1 / self.instrument.wavelength) * (los_displacements - (psis * heights))
+        phases = self.data.values
 
         # Wrap interferogram
         phases = np.fmod(phases, 2 * np.pi)
@@ -331,9 +372,11 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/' + 'interferogram_' + self.deformation_map.pyre_name + '_' +
-                    str(self.campaign.body_id) + '_' + str(self.track1.start_time) + '_' + str(
-                        self.track1.end_time) +
-                    '_' + str(self.track2.start_time) + '_' + str(self.track2.end_time) + '.png', format='png',
+                    str(self.campaign.body_id) +
+                    '_' + str(self.track.start_time + self.time_offset_first_acquisition) + '_' + str(
+                        self.track.end_time + self.time_offset_first_acquisition) +
+                    '_' + str(self.track.start_time + self.time_offset_second_acquisition) +
+                    '_' + str(self.track.end_time + self.time_offset_second_acquisition) + '.png', format='png',
                     dpi=500)
 
     def visualize_displacements(self, projection, fig=None, globe=None, ax=None, return_fig=False):
@@ -354,7 +397,8 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
         # Load the values to plot
         longitudes = self.data["longitude"].values
         latitudes = self.data["latitude"].values
-        los_displacements = self.data.values
+        phases = self.get_inverse_phases(position1_error=0, position2_error=0, topography_error=0)
+        los_displacements = self.instrument.wavelength * phases / (4 * np.pi)
 
         im = ax.scatter(longitudes, latitudes,
                         transform=ccrs.PlateCarree(globe=globe),
@@ -372,9 +416,11 @@ class SimpleInterferogram(pet.component, family="pet.dataAnalysis.surfaceDeforma
 
         # Save the plot
         plt.savefig(fname=projection.folder_path + '/' + 'displacements_' + self.deformation_map.pyre_name + '_' +
-                    str(self.campaign.body_id) + '_' + str(self.track1.start_time) + '_' + str(
-                        self.track1.end_time) +
-                    '_' + str(self.track2.start_time) + '_' + str(self.track2.end_time) + '.png', format='png',
+                    str(self.campaign.body_id) +
+                    '_' + str(self.track.start_time + self.time_offset_first_acquisition) + '_' + str(
+                        self.track.end_time + self.time_offset_first_acquisition) +
+                    '_' + str(self.track.start_time + self.time_offset_second_acquisition) +
+                    '_' + str(self.track.end_time + self.time_offset_second_acquisition) + '.png', format='png',
                     dpi=500)
 
 # end of file

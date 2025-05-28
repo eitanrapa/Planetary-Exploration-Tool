@@ -191,7 +191,7 @@ class ChirpChirp(pet.component, family="pet.instruments.inSAR.chirpChirp", imple
                                                   incidence_angle=incidence_angles, baseline=perpendicular_baseline,
                                                   wavelength=self.wavelength, slant_range=distances)
         corr_volume, ho_a, ho_a_vol = self.volume_correlation(eps=planet.surface_permittivity,
-                                              penetration_depth=planet.radar_penetration_depth,
+                                              penetration_depth=planet.radar_penetration_length,
                                               baseline=perpendicular_baseline, slant_range=distances, wavelength=self.wavelength,
                                               incidence_angle=incidence_angles)
 

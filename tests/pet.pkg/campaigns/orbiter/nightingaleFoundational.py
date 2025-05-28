@@ -17,16 +17,16 @@ fm.furnsh(names_list=["cas_enceladus_ssd_spc_1024icq_v1.bds", "pck00011_n0066.tp
 # Make a planet
 planet = pet.planets.enceladus(name="enceladus")
 
-print([axis for axis in planet.get_axes()])
+# Make a con ops
+campaign = pet.campaigns.orbiter.nightingaleFoundational(name="nightingale",
+                                                 body_id=-303, start_time="2046 DEC 20 15:10:40.134", planet=planet)
 
-# Make a projection
-projection = pet.projections.biaxialProjections.biaxialPlanar(name="biaxial planar",
-                                                              central_latitude=-90, north_extent=-30,
-                                                              folder_path="/home/user/Documents/"
-                                                                          "GitHub/Planetary-Exploration-Tool/figs")
+# Create a time conversion instance
+time_conversion = pet.spiceTools.timeConversion()
 
-# Visualize
-planet.visualize_topography(projection=projection)
+time = campaign.get_et_start_time()
+
+print(time)
 
 fm.clear()
 

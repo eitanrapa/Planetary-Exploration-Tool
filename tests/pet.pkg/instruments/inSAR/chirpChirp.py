@@ -14,9 +14,10 @@ instrument = pet.instruments.inSAR.chirpChirp(name="chirp chirp")
 planet = pet.planets.enceladus(name="enceladus")
 
 # Print the bandwidth
-sigma_phase, corr_tot, n_looks, nesn, sigma0 =\
-    instrument.get_instrument_noise(planet, baseline=10, satellite_velocities=[100, 120, 140],
-                                    look_angles=[20, 30, 40], incidence_angles=[10, 20 ,30],
+sigma_phase, sigma_height, sigma_disp, corr_tot, n_looks, nesn, sigma0 =\
+    instrument.get_instrument_noise(planet=planet, perpendicular_baseline=10, satellite_velocities=[100, 120, 140],
+                                    look_angles=[20, 30, 40], non_projected_incidence_angles=[10, 20, 30],
+                                    incidence_angles=[10, 20 ,30],
                                     distances=[100e3, 100e3, 100e3],
                                     variable_backscatter=True)
 
