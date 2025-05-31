@@ -117,7 +117,8 @@ class SurfaceDeformation1DTimeSeries(pet.component,
         # Save xarray to object
         self.data = da
 
-    def calculate_uncertainty(self, uncertainty_c, uncertainty_s, a, phase):
+    @staticmethod
+    def calculate_uncertainty(uncertainty_c, uncertainty_s, a, phase):
         """
         Calculate the uncertainty of the amplitude and phase
         :param uncertainty_c: uncertainty of the c parameter
@@ -144,15 +145,11 @@ class SurfaceDeformation1DTimeSeries(pet.component,
         :return: Nothing returned
         """
 
-        interferogram, spatial_points, alpha, planet_values = args
-
-        # Define the tidal cycle
-        tidal_cycle = planet_values["tidal_cycle"]
-        topography_uncertainty = planet_values["topography_uncertainty"]
+        forward_data_array, inverse_data_array, spatial_points, alpha, tidal_cycle, wavelength = args
 
         # Extract data
-        latitudes = interferogram["latitude"].values
-        longitudes = interferogram["longitude"].values
+        latitudes = inverse_data_array["latitude"].values
+        longitudes = inverse_data_array["longitude"].values
         points = np.column_stack((latitudes, longitudes))
 
         # Create alpha shape (polygon)
@@ -167,33 +164,56 @@ class SurfaceDeformation1DTimeSeries(pet.component,
 
         # Initialize results dictionary
         results = {var: np.full(len(spatial_points), np.nan) for var in
-                   ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]}
+                   ["time", "los_displacement_ref", "kz_k", "x", "y", "z", "sigma_phase", "nlooks",
+                                                                                          "correlation"]}
 
         # Interpolate each desired variable
-        for var in results.keys():
-            values = interferogram.values if var == "los_displacements" else interferogram[var].values
-            interpolated_values = griddata(points, values, xi=valid_points, method="cubic")
+        for var in ["time", "los_displacement_ref", "kz_k", "x", "y", "z"]:
+            values = inverse_data_array[var].values
+
+            # Perform interpolation only for valid points
+            interpolated_values = griddata(points=points, values=values, xi=valid_points, method="cubic")
+
+            # Assign interpolated values back to the corresponding positions
+            results[var][is_inside] = interpolated_values
+
+        # Interpolate each desired variable
+        for var in ["sigma_phase", "nlooks", "correlation"]:
+            values = forward_data_array[var].values
+
+            # Perform interpolation only for valid points
+            interpolated_values = griddata(points=points, values=values, xi=valid_points, method="cubic")
+
+            # Assign interpolated values back to the corresponding positions
             results[var][is_inside] = interpolated_values
 
         # Extract interpolated values
-        sat_times = np.asarray(results["sat_pos_time"])
-        time1_interps = (np.asarray(results["time1"]) % tidal_cycle)
-        time2_interps = (np.asarray(results["time2"]) % tidal_cycle)
-        x_interps, y_interps, z_interps = np.asarray(results["x"]), np.asarray(results["y"]), np.asarray(results["z"])
-        los_displacement_interps = np.asarray(results["los_displacements"])
-        psis_interps_real = np.asarray(results["psi"]) * interferogram.attrs["baseline"]
-        psis_interps_know = np.asarray(results["psi"]) * np.random.normal(
-            loc=interferogram.attrs["baseline"], scale=interferogram.attrs["baseline_uncertainty"])
-        los_displacement_interps_with_noise = (los_displacement_interps +
-                                               psis_interps_real * topography_uncertainty)
+        times = np.asarray(results["time"])
+        x_interps = np.asarray(results["x"])
+        y_interps = np.asarray(results["y"])
+        z_interps = np.asarray(results["z"])
+        sigma_phase = np.asarray(results["sigma_phase"])
+        nlooks = np.asarray(results["nlooks"])
+        correlation = np.asarray(results["correlation"])
+        phase_noise = np.where(
+            np.isnan(sigma_phase),
+            np.nan,
+            np.random.normal(loc=0, scale=np.abs(sigma_phase))
+        )
+        los_displacement_interps_with_noise = (np.asarray(results["los_displacement_ref"])
+                                               + phase_noise / (4 * np.pi / wavelength))
+        psis = np.asarray(results["kz_k"]) / (4 * np.pi) * wavelength
+
+        times1 = (times + inverse_data_array.attrs["time_offset_first_acquisition"]) % tidal_cycle
+        times2 = (times + inverse_data_array.attrs["time_offset_second_acquisition"]) % tidal_cycle
 
         # Prepare data for return
         valid_point_indices = np.where(is_inside)[0]
 
-        return (sat_times, valid_point_indices, los_displacement_interps_with_noise,
-                x_interps, y_interps, z_interps, time1_interps, time2_interps, psis_interps_know)
+        return (times, times1, times2, valid_point_indices, los_displacement_interps_with_noise, psis, x_interps,
+                y_interps, z_interps, correlation, nlooks)
 
-    def create_1d_time_series(self, interferograms, spatial_points, alpha=0.3, processors=1):
+    def create_1d_time_series(self, interferograms, spatial_points, alpha=1, processors=1):
         """
         Return the amplitudes, phases, and topographic errors of a set of points in 1 look direction
         :param interferograms: interferograms to analyze, in 1 look direction
@@ -207,6 +227,9 @@ class SurfaceDeformation1DTimeSeries(pet.component,
         d_vectors = {i: [] for i in range(len(spatial_points))}  # List to collect rows for each point
         g_matrices = {i: [] for i in range(len(spatial_points))}
 
+        # Set up data covariance matrices
+        cd_s = {i: [] for i in range(len(spatial_points))}
+
         # Define the tidal cycle, and therefore the angular frequency
         tidal_cycle = self.planet.tidal_cycle
         omega = 2 * np.pi / tidal_cycle
@@ -219,11 +242,12 @@ class SurfaceDeformation1DTimeSeries(pet.component,
             for interferogram in tqdm(interferograms, desc="Interpolating interferograms..."):
 
                 # Load the data
-                data_array = interferogram.data
+                forward_data_array = interferogram.forward_data
+                inverse_data_array = interferogram.inverse_data
 
                 # Extract data
-                latitudes = data_array["latitude"].values
-                longitudes = data_array["longitude"].values
+                latitudes = inverse_data_array["latitude"].values
+                longitudes = inverse_data_array["longitude"].values
                 points = np.column_stack((latitudes, longitudes))
 
                 # Create alpha shape (polygon)
@@ -238,14 +262,24 @@ class SurfaceDeformation1DTimeSeries(pet.component,
 
                 # Initialize results dictionary
                 results = {var: np.full(len(spatial_points), np.nan) for var in
-                           ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]}
+                           ["time", "los_displacement_ref", "kz_k", "x", "y", "z", "sigma_phase", "nlooks",
+                                                                                                  "correlation"]}
 
                 # Interpolate each desired variable
-                for var in ["time1", "time2", "los_displacements", "sat_pos_time", "psi", "x", "y", "z"]:
-                    if var == "los_displacements":
-                        values = data_array.values
-                    else:
-                        values = data_array[var].values
+                for var in ["time", "los_displacement_ref", "kz_k", "x", "y", "z"]:
+
+                    values = inverse_data_array[var].values
+
+                    # Perform interpolation only for valid points
+                    interpolated_values = griddata(points=points, values=values, xi=valid_points, method="cubic")
+
+                    # Assign interpolated values back to the corresponding positions
+                    results[var][is_inside] = interpolated_values
+
+                # Interpolate each desired variable
+                for var in ["sigma_phase", "nlooks","correlation"]:
+
+                    values = forward_data_array[var].values
 
                     # Perform interpolation only for valid points
                     interpolated_values = griddata(points=points, values=values, xi=valid_points, method="cubic")
@@ -254,21 +288,26 @@ class SurfaceDeformation1DTimeSeries(pet.component,
                     results[var][is_inside] = interpolated_values
 
                 # Extract interpolated values
-                sat_times = np.asarray(results["sat_pos_time"])
-                time1_interps = (np.asarray(results["time1"]) % tidal_cycle)
-                time2_interps = (np.asarray(results["time2"]) % tidal_cycle)
+                times = np.asarray(results["time"])
                 x_interps = np.asarray(results["x"])
                 y_interps = np.asarray(results["y"])
                 z_interps = np.asarray(results["z"])
-                los_displacement_interps = np.asarray(results["los_displacements"])
-                psis_interps_real = np.asarray(results["psi"]) * data_array.attrs["baseline"]
-                psis_interps_know = np.asarray(results["psi"]) * np.random.normal(
-                    loc=data_array.attrs["baseline"], scale=data_array.attrs["baseline_uncertainty"])
-                los_displacement_interps_with_noise = (los_displacement_interps +
-                                                       psis_interps_real * self.topography_uncertainty)
+                sigma_phase = np.asarray(results["sigma_phase"])
+                nlooks = np.asarray(results["nlooks"])
+                correlation = np.asarray(results["correlation"])
+                phase_noise = np.where(
+                    np.isnan(sigma_phase),
+                    np.nan,
+                    np.random.normal(loc=0, scale=np.abs(sigma_phase))
+                )
+                los_displacement_interps_with_noise = (np.asarray(results["los_displacement_ref"])
+                                            + phase_noise / (4 * np.pi / self.instrument.wavelength))
+                psis = np.asarray(results["kz_k"]) / (4 * np.pi) * self.instrument.wavelength
+                times1 = (times + inverse_data_array.attrs["time_offset_first_acquisition"]) % tidal_cycle
+                times2 = (times + inverse_data_array.attrs["time_offset_second_acquisition"]) % tidal_cycle
 
                 # Get the satellite and surface positions
-                satellite_positions, _ = self.campaign.get_states(times=sat_times)
+                satellite_positions, _ = self.campaign.get_states(times=times)
                 surface_positions = np.asarray([x_interps, y_interps, z_interps]).T
 
                 # Calculate vectors from satellite to point and the satellite's direction
@@ -281,32 +320,29 @@ class SurfaceDeformation1DTimeSeries(pet.component,
                     if not any(np.allclose(vectors_to_sat[i], x, atol=0.1) for x in line_of_sight_vectors[i]):
                         line_of_sight_vectors[i].append(vectors_to_sat[i])
 
+                    cd_s[i].append(np.sqrt(self.instrument.wavelength / (4 * np.pi * nlooks[i] *
+                                                                          (1 - correlation[i]**2) /
+                                                                          correlation[i]**2)))
                     d_vectors[i].append(los_displacement_interps_with_noise[i])
-                    g_matrices[i].append([np.cos(omega * time2_interps[i]) - np.cos(omega * time1_interps[i]),
-                                          np.sin(omega * time2_interps[i]) - np.sin(omega * time1_interps[i]),
-                                          psis_interps_know[i]])
+                    g_matrices[i].append([np.cos(omega * times2[i]) - np.cos(omega * times1[i]),
+                                          np.sin(omega * times2[i]) - np.sin(omega * times1[i]),
+                                          psis[i]])
 
         else:
-
-            # Extract only necessary values to avoid pickle issues
-            planet_values = {
-                "tidal_cycle": self.planet.tidal_cycle,
-                "topography_uncertainty": self.planet.topography_uncertainty
-            }
 
             with Pool(processors) as pool:
 
                 results = list(tqdm(pool.imap(self.parallel_interpolate_interferogram,
-                                              [(interferogram.data,
-                                                spatial_points, alpha, planet_values)
+                                              [(interferogram.forward_data, interferogram.inverse_data,
+                                                spatial_points, alpha, tidal_cycle, self.instrument.wavelength)
                                                for interferogram in interferograms]),
                                     total=len(interferograms), desc="Interpolating interferograms..."))
 
-            for (sat_times, valid_point_indices, los_displacement_interps_with_noise,
-                 x_interps, y_interps, z_interps, time1_interps, time2_interps, psis_interps) in results:
+            for (times, times1, times2, valid_point_indices, los_displacement_interps_with_noise, psis,
+                 x_interps, y_interps, z_interps, correlation, nlooks) in results:
 
                 # Get satellite and surface positions
-                satellite_positions, _ = self.campaign.get_states(times=sat_times)
+                satellite_positions, _ = self.campaign.get_states(times=times)
                 surface_positions = np.asarray([x_interps, y_interps, z_interps]).T
 
                 # Compute vectors to satellite
@@ -317,17 +353,19 @@ class SurfaceDeformation1DTimeSeries(pet.component,
                 for i in valid_point_indices:
                     if not any(np.allclose(vectors_to_sat[i], x, atol=0.1) for x in line_of_sight_vectors[i]):
                         line_of_sight_vectors[i].append(vectors_to_sat[i])
+
+                    cd_s[i].append(np.sqrt(self.instrument.wavelength / (4 * np.pi * nlooks[i] *
+                                                                         (1 - correlation[i] ** 2) /
+                                                                         correlation[i] ** 2)))
                     d_vectors[i].append(los_displacement_interps_with_noise[i])
-                    g_matrices[i].append([np.cos(omega * time2_interps[i]) - np.cos(omega * time1_interps[i]),
-                                          np.sin(omega * time2_interps[i]) - np.sin(omega * time1_interps[i]),
-                                          psis_interps[i]])
+                    g_matrices[i].append([np.cos(omega * times2[i]) - np.cos(omega * times1[i]),
+                                          np.sin(omega * times2[i]) - np.sin(omega * times1[i]),
+                                          psis[i]])
 
         # Convert lists to numpy arrays and reshape
         d_vectors = {i: np.array(d_vectors[i]) for i in d_vectors}  # Shape: (num_times, d_dim)
         g_matrices = {i: np.array(g_matrices[i]) for i in g_matrices}  # Shape: (num_times, G_dim)
-
-        # Setup data covariance matrices as identity matrices of size amount of rows in g_matrices
-        c_ds = {i: np.eye(len(g_matrices[i])) for i in g_matrices}
+        cd_s = {i: np.diag(cd_s[i]) for i in cd_s}  # Shape: (num_times, num_times)
 
         # Make a list of amplitudes, phases, topography errors
         amplitudes = []
@@ -348,14 +386,14 @@ class SurfaceDeformation1DTimeSeries(pet.component,
 
             else:
                 # Do the inverse problem
-                m = (np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_ds[i]) @ g_matrices[i])
-                     @ (g_matrices[i].T @ np.linalg.inv(c_ds[i]) @ d_vectors[i]))
+                m = (np.linalg.inv(g_matrices[i].T @ np.linalg.inv(cd_s[i]) @ g_matrices[i])
+                     @ (g_matrices[i].T @ np.linalg.inv(cd_s[i]) @ d_vectors[i]))
 
                 # Retrieve the parameters
                 c, s, z = m
 
                 # Calculate amplitudes and phases
-                covariance_matrix = np.linalg.inv(g_matrices[i].T @ np.linalg.inv(c_ds[i]) @ g_matrices[i])
+                covariance_matrix = np.linalg.inv(g_matrices[i].T @ np.linalg.inv(cd_s[i]) @ g_matrices[i])
                 a = np.sqrt(c ** 2 + s ** 2)
 
                 # If a is negative, flip the sign and add pi to the phase

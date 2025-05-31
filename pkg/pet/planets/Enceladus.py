@@ -30,10 +30,6 @@ class Enceladus(pet.component, family="pet.planets.enceladus", implements=pet.pr
     tidal_cycle.default = 118386.8352
     tidal_cycle.doc = "The tidal cycle of Enceladus [s]"
 
-    topography_uncertainty = pet.properties.float()
-    topography_uncertainty.default = 100
-    topography_uncertainty.doc = "The uncertainty in the topography of Enceladus [m]"
-
     surface_backscatter = pet.properties.float()
     surface_backscatter.default = 0
     surface_backscatter.doc = "The surface backscatter of Enceladus [dB]"
